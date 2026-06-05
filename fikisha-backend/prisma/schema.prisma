@@ -6,6 +6,8 @@
 generator client {
   provider = "prisma-client"
   output   = "../generated/prisma"
+  previewFeatures = ["driverAdapters"]
+  moduleFormat    = "commonjs"
 }
 
 datasource db {
@@ -40,7 +42,7 @@ model User {
   school       School   @relation(fields: [schoolId], references: [id])
 
   name         String
-  phone        String   @unique
+  phone        String
   email        String?  @unique
   passwordHash String
 
@@ -55,6 +57,7 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@unique([schoolId, phone])
   @@index([schoolId])
 }
 
