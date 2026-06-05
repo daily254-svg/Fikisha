@@ -11,3 +11,316 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+// school model
+model School {
+  id        String   @id @default(uuid())
+  name      String
+  email     String?
+  phone     String?
+  address   String?
+  plan      String   @default("basic")
+  status    String   @default("active")
+
+  users     User[]
+  students  Student[]
+  buses     Bus[]
+  routes    Route[]
+  parents   Parent[]
+  drivers   Driver[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// user auth core
+model User {
+  id           String   @id @default(uuid())
+  schoolId     String
+  school       School   @relation(fields: [schoolId], references: [id])
+
+  name         String
+  phone        String   @unique
+  email        String?  @unique
+  passwordHash String
+
+  role         UserRole
+  status       String   @default("active")
+
+  parent       Parent?
+  driver       Driver?
+
+  notifications Notification[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([schoolId])
+}
+
+enum UserRole {
+  SCHOOL_ADMIN
+  DRIVER
+  PARENT
+}
+
+// parent model
+model Parent {
+  id        String @id @default(uuid())
+  userId    String @unique
+  user      User   @relation(fields: [userId], references: [id])
+
+  schoolId  String
+  school    School @relation(fields: [schoolId], references: [id])
+
+  students  ParentStudent[]
+
+  createdAt DateTime @default(now())
+}
+
+// student model
+model Student {
+  id          String @id @default(uuid())
+  schoolId    String
+  school      School @relation(fields: [schoolId], references: [id])
+
+  admissionNo String
+  firstName   String
+  lastName    String
+  grade       String?
+  gender      String?
+
+  parents     ParentStudent[]
+  routes      StudentRoute[]
+  events      TransportEvent[]
+
+  createdAt DateTime @default(now())
+
+  @@index([schoolId])
+  @@unique([schoolId, admissionNo])  // Fix #8: Unique admission number per school
+}
+
+// PARENT ↔ STUDENT (MANY TO MANY) 
+model ParentStudent {
+  id        String @id @default(uuid())
+  schoolId  String
+
+  parentId  String
+  studentId String
+
+  parent    Parent  @relation(fields: [parentId], references: [id])
+  student   Student @relation(fields: [studentId], references: [id])
+
+  relationship String  // mother, father, guardian
+  isPrimary    Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@index([schoolId])
+  @@unique([parentId, studentId])  // Fix #10: Prevent duplicate parent-student links
+}
+
+// DRIVER
+model Driver {
+  id        String @id @default(uuid())
+  userId    String @unique
+  user      User   @relation(fields: [userId], references: [id])
+
+  schoolId  String
+  school    School @relation(fields: [schoolId], references: [id])
+  licenseNo String?
+  employeeNo String?
+
+  busAssignments BusAssignment[]
+
+  createdAt DateTime @default(now())
+}
+
+// Bus model
+model Bus {
+  id        String @id @default(uuid())
+  schoolId  String
+  school    School @relation(fields: [schoolId], references: [id])
+
+  registrationNumber String
+  capacity           Int?
+
+  routes      Route[]
+  assignments BusAssignment[]
+  location    BusLocation?           // One-to-one with BusLocation
+  events      TransportEvent[]       // One-to-many with TransportEvent
+  locationHistory BusLocationHistory[] // One-to-many with BusLocationHistory (ADD THIS)
+
+  createdAt DateTime @default(now())
+
+  @@index([schoolId])
+  @@unique([schoolId, registrationNumber])
+}
+
+// BUS ASSIGNMENT (DRIVER ↔ BUS)
+model BusAssignment {
+  id        String @id @default(uuid())
+  schoolId  String
+
+  busId     String
+  driverId  String
+
+  bus       Bus    @relation(fields: [busId], references: [id])
+  driver    Driver @relation(fields: [driverId], references: [id])
+
+  startDate DateTime @default(now())
+  endDate   DateTime?
+  isActive  Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+
+  @@index([schoolId])
+}
+
+// Route
+model Route {
+  id        String @id @default(uuid())
+  schoolId  String
+
+  name      String
+  direction RouteDirection
+
+  busId     String?
+  bus       Bus?   @relation(fields: [busId], references: [id])
+  school    School @relation(fields: [schoolId], references: [id])  // Fix #5: Add school relation
+
+  stops     RouteStop[]
+  students  StudentRoute[]
+
+  createdAt DateTime @default(now())
+
+  @@index([schoolId])
+}
+
+enum RouteDirection {
+  MORNING
+  EVENING
+}
+
+// Route stops
+model RouteStop {
+  id        String @id @default(uuid())
+  schoolId  String
+
+  routeId   String
+  route     Route @relation(fields: [routeId], references: [id])
+
+  name      String
+  latitude  Float
+  longitude Float
+
+  sequence      Int
+  radiusMeters  Int @default(300)
+
+  createdAt DateTime @default(now())
+
+  @@index([schoolId])
+}
+
+// STUDENT ROUTE ASSIGNMENT
+model StudentRoute {
+  id        String @id @default(uuid())
+  schoolId  String
+
+  studentId String
+  routeId   String
+
+  pickupStopId  String?
+  dropoffStopId String?
+
+  student  Student @relation(fields: [studentId], references: [id])
+  route    Route   @relation(fields: [routeId], references: [id])
+
+  active Boolean @default(true)
+
+  createdAt DateTime @default(now())
+
+  @@index([schoolId])
+  @@unique([studentId, routeId])  // Fix #11: Prevent duplicate route assignments
+}
+
+// LIVE BUS LOCATION (REAL TIME)
+model BusLocation {
+  busId     String @id
+  schoolId  String
+
+  latitude  Float
+  longitude Float
+  speed     Float?
+  heading   Float?
+
+  updatedAt DateTime @updatedAt
+
+  bus Bus @relation(fields: [busId], references: [id])
+}
+
+// LOCATION HISTORY
+model BusLocationHistory {
+  id        String @id @default(uuid())
+  schoolId  String
+
+  busId     String
+  latitude  Float
+  longitude Float
+
+  createdAt DateTime @default(now())
+
+  bus Bus @relation(fields: [busId], references: [id])  // Fix #6: Add bus relation
+
+  @@index([busId])
+}
+
+// NOTIFICATIONS
+model Notification {
+  id        String @id @default(uuid())
+  schoolId  String
+
+  userId    String
+  user      User   @relation(fields: [userId], references: [id])
+
+  title     String
+  message   String
+  type      NotificationType
+
+  isRead    Boolean @default(false)
+
+  createdAt DateTime @default(now())
+}
+
+enum NotificationType {
+  BUS_APPROACHING
+  PICKED_UP
+  DROPPED_OFF
+  EMERGENCY
+  DELAY
+}
+
+// TRANSPORT EVENTS (TRUST LAYER)
+model TransportEvent {
+  id        String @id @default(uuid())
+  schoolId  String
+
+  studentId String
+  busId     String
+
+  type      TransportEventType
+
+  latitude  Float?
+  longitude Float?
+
+  createdAt DateTime @default(now())
+
+  student Student @relation(fields: [studentId], references: [id])
+  bus     Bus     @relation(fields: [busId], references: [id])  // Fix #7: Add bus relation
+}
+
+enum TransportEventType {
+  PICKED_UP
+  DROPPED_OFF
+  ABSENT
+}
