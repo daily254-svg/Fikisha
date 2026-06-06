@@ -21,11 +21,22 @@ export class RedisService {
     await this.redis.set(key, value);
   }
 
-  async setex(key: string, ttlSeconds: number, value: string): Promise<void> {
+  async setex(
+    key: string,
+    ttlSeconds: number,
+    value: string,
+  ): Promise<void> {
     await this.redis.setex(key, ttlSeconds, value);
   }
 
   async del(key: string): Promise<void> {
     await this.redis.del(key);
   }
+
+  async keys(pattern: string): Promise<string[]> {
+    return this.redis.keys(pattern);
+  }
 }
+
+// ⚠️ redis.keys() scans entire keyspace — fine for MVP
+// Replace with redis.scan() when bus count grows beyond ~100
