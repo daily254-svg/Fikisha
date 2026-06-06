@@ -1,12 +1,13 @@
 import { io, Socket } from 'socket.io-client'
+import * as SecureStore from 'expo-secure-store'
 
-const WS_URL = process.env.NEXT_PUBLIC_WS_URL
+const WS_URL = process.env.EXPO_PUBLIC_WS_URL
 
 let socket: Socket | null = null
 
-export function getSocket(): Socket {
+export async function getSocket(): Promise {
   if (!socket) {
-    const token = localStorage.getItem('fikisha_token')
+    const token = await SecureStore.getItemAsync('fikisha_token')
 
     socket = io(`${WS_URL}/tracking`, {
       auth: { token },
@@ -17,8 +18,8 @@ export function getSocket(): Socket {
   return socket
 }
 
-export function connectSocket(): void {
-  const s = getSocket()
+export async function connectSocket(): Promise {
+  const s = await getSocket()
   if (!s.connected) s.connect()
 }
 
