@@ -419,7 +419,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.15,
     shadowRadius: 12,
-    elevation: 10,
+    elevation: 30,
     zIndex: 20,
   },
   sheetHandle: {
@@ -429,14 +429,14 @@ const styles = StyleSheet.create({
   },
   sheetHandleBar: {
     width: 40,
-    height: 8,
+    height: 4,
     borderRadius: 2,
     backgroundColor: '#E2E8F0',
     marginBottom: 8,
   },
   sheetContent: {
     paddingHorizontal: 20,
-    paddingTop: 4,
+    paddingTop: 2,
     flex: 1,
     paddingBottom: 80,  // <-- ADD THIS: clears the BottomNav (~65px) + extra breathing room
   },
@@ -444,7 +444,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 16,
+    marginBottom: 14,
   },
   busPlate: {
     color: '#1B365D',
@@ -472,7 +472,7 @@ const styles = StyleSheet.create({
   statsRow: {
     flexDirection: 'row',
     gap: 12,
-    marginBottom: 16,
+    marginBottom: 10,
   },
   statCard: {
     flex: 1,
@@ -493,7 +493,7 @@ const styles = StyleSheet.create({
   },
   // Upcoming stops
   upcomingStops: {
-    marginBottom: 12,
+    marginBottom: 9,
   },
   upcomingStopsTitle: {
     color: '#1B365D',
