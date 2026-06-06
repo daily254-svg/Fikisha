@@ -14,6 +14,7 @@ import { TrackingService } from '../../modules/tracking/tracking.service';
 import { GpsUpdateDto } from './dto/gps-update.dto';
 import { RouteStartDto } from './dto/route-start.dto';
 import { StudentEventDto } from './dto/student-event.dto';
+import { SkipThrottle } from '@nestjs/throttler';
 
 interface AuthenticatedSocket extends Socket {
   user?: {
@@ -24,11 +25,14 @@ interface AuthenticatedSocket extends Socket {
   };
 }
 
+@SkipThrottle()
 @WebSocketGateway({
   cors: { origin: '*' }, // tighten in production
   namespace: '/tracking',
 })
-export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect {
+export class TrackingGateway
+  implements OnGatewayConnection, OnGatewayDisconnect
+{
   @WebSocketServer()
   server!: Server;
 
@@ -41,7 +45,8 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
 
   async handleConnection(client: AuthenticatedSocket): Promise<void> {
     try {
-      const token = client.handshake.auth?.token || client.handshake.query?.token;
+      const token =
+        client.handshake.auth?.token || client.handshake.query?.token;
 
       if (!token) {
         this.logger.warn(`Client ${client.id} rejected: no token`);
@@ -113,11 +118,19 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
 
     const { schoolId } = client.user;
 
-    const result = await this.trackingService.handleRouteStart(schoolId, payload);
-    this.logger.log(`Broadcasting route_started to room: parents:${schoolId}`)
+    const result = await this.trackingService.handleRouteStart(
+      schoolId,
+      payload,
+    );
+
+    this.logger.log(
+      `Broadcasting route_started to room: parents:${schoolId}`,
+    );
 
     this.server.to(`parents:${schoolId}`).emit('route_started', result);
-    this.server.to(`school:${schoolId}:drivers`).emit('route_started', result);
+    this.server
+      .to(`school:${schoolId}:drivers`)
+      .emit('route_started', result);
   }
 
   @SubscribeMessage('route_end')
@@ -149,7 +162,9 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
       payload,
     );
 
-    this.server.to(`parents:${client.user.schoolId}`).emit('student_picked_up', result);
+    this.server
+      .to(`parents:${client.user.schoolId}`)
+      .emit('student_picked_up', result);
   }
 
   @SubscribeMessage('student_dropoff')
@@ -165,7 +180,9 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
       payload,
     );
 
-    this.server.to(`parents:${client.user.schoolId}`).emit('student_dropped_off', result);
+    this.server
+      .to(`parents:${client.user.schoolId}`)
+      .emit('student_dropped_off', result);
   }
 
   private verifyToken(token: string): any | null {

@@ -7,6 +7,7 @@ import { UsersService } from '../users/users.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
 import type { JwtPayload } from './strategies/jwt.strategy';
+import { Delete } from '@nestjs/common'
 
 @Controller('auth')
 export class AuthController {
@@ -36,5 +37,11 @@ export class AuthController {
     @Body() dto: UpdateFcmTokenDto,
   ) {
     return this.usersService.updateFcmToken(user.sub, dto.fcmToken);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Delete('fcm-token')
+  clearFcmToken(@CurrentUser() user: JwtPayload) {
+    return this.usersService.clearFcmToken(user.sub)
   }
 }

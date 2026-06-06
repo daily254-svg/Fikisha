@@ -121,6 +121,13 @@ export class UsersService {
     });
   }
 
+  async clearFcmToken(userId: string): Promise<void> {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { fcmToken: null },
+    })
+  }
+
   private async ensurePhoneUniqueInSchool(schoolId: string, phone: string) {
     const existing = await this.prisma.user.findUnique({
       where: {
