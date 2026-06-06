@@ -13,6 +13,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Lock, Eye, EyeOff, CheckCircle } from 'lucide-react-native';
+import { authService } from '@/services/auth.service';
+import { useAuth } from '@/hooks/useAuth';
 
 interface ChangePasswordScreenProps {
   onPasswordChanged: () => void;
@@ -55,11 +57,21 @@ export function ChangePasswordScreen({
       return;
     }
 
+    const { setFirstLoginDone } = useAuth();
+
     setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
-      onPasswordChanged();
-    }, 1500);
+    (async () => {
+      try {
+        await authService.changePassword({ currentPassword, newPassword });
+        setFirstLoginDone();
+        onPasswordChanged();
+      } catch (err: any) {
+        console.error(err);
+        setError(err?.message || 'Failed to change password');
+      } finally {
+        setIsLoading(false);
+      }
+    })();
   };
 
   const passwordStrength =

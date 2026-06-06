@@ -15,7 +15,7 @@ import { Eye, EyeOff, Phone, Lock, ArrowRight } from 'lucide-react-native';
 import Svg, { Rect, Circle, Path } from 'react-native-svg';
 
 interface LoginScreenProps {
-  onLogin: (role: 'parent' | 'driver', isFirstLogin: boolean, phone: string) => void;
+  onLogin: (role: 'parent' | 'driver', phone: string, password: string) => void;
   onForgotPassword: () => void;
 }
 
@@ -34,8 +34,7 @@ export function LoginScreen({ onLogin, onForgotPassword }: LoginScreenProps) {
       return;
     }
 
-    const isFirstLogin = password === phone;
-    onLogin(role, isFirstLogin, phone);
+    onLogin(role, phone, password);
   };
 
   return (

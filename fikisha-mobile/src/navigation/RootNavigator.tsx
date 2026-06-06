@@ -30,7 +30,7 @@ interface RootNavigationProps {
   role: 'parent' | 'driver';
   userPhone: string;
   onNavigate: (screen: string) => void;
-  onLogin: (role: 'parent' | 'driver', isFirstLogin: boolean, phone: string) => void;
+  onLogin: (role: 'parent' | 'driver', phone: string, password: string) => void;
   onPasswordChanged: () => void;
   onResetSent: () => void;
   onLogout: () => void;

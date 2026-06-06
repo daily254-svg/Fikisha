@@ -4,18 +4,18 @@ import { GpsUpdate } from '@/types';
 interface TrackingState {
   busLocations: Record<string, GpsUpdate>;
   isTracking: boolean;
-  currentRouteId: string | null;
+  currentBusId: string | null;
 
   updateBusLocation: (busId: string, location: GpsUpdate) => void;
   setTracking: (isTracking: boolean) => void;
-  setCurrentRoute: (routeId: string | null) => void;
+  setCurrentBus: (busId: string | null) => void;
   clearTracking: () => void;
 }
 
 export const useTrackingStore = create<TrackingState>((set) => ({
   busLocations: {},
   isTracking: false,
-  currentRouteId: null,
+  currentBusId: null,
 
   updateBusLocation: (busId, location) =>
     set((state) => ({
@@ -24,8 +24,8 @@ export const useTrackingStore = create<TrackingState>((set) => ({
 
   setTracking: (isTracking) => set({ isTracking }),
 
-  setCurrentRoute: (routeId) => set({ currentRouteId: routeId }),
+  setCurrentBus: (busId) => set({ currentBusId: busId }),
 
   clearTracking: () =>
-    set({ busLocations: {}, isTracking: false, currentRouteId: null }),
+    set({ busLocations: {}, isTracking: false, currentBusId: null }),
 }));

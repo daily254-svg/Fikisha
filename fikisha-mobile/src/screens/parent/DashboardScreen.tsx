@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
+import { parentsService } from '@/services/parents.service';
+import { useTracking } from '@/hooks/useTracking';
 import {
   Bell,
   MapPin,
@@ -49,6 +51,46 @@ const notifications = [
 ];
 
 export function ParentDashboard({ onNavigate }: ParentDashboardProps) {
+  const [parentName, setParentName] = useState('');
+  const [children, setChildren] = useState<any[]>([]);
+  const [selectedChild, setSelectedChild] = useState<any | null>(null);
+  const [busId, setBusId] = useState<string | null>(null);
+
+  const { liveLocation, dbLocation, isLive, isLoading } = useTracking(busId);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const profile = await parentsService.getProfile();
+        setParentName(profile.data?.name || '');
+      } catch (e) {
+        // ignore
+      }
+
+      try {
+        const res = await parentsService.getStudents();
+        const list = res.data || [];
+        setChildren(list);
+        const first = list[0] ?? null;
+        setSelectedChild(first);
+        if (first) {
+          const bus = first.routes?.[0]?.route?.bus;
+          if (bus?.id) setBusId(bus.id);
+          else {
+            try {
+              const busRes = await parentsService.getStudentBus(first.id);
+              setBusId(busRes.data?.id ?? null);
+            } catch (err) {
+              // ignore
+            }
+          }
+        }
+      } catch (e) {
+        // ignore
+      }
+    })();
+  }, []);
+
   const handleCallSchool = () => {
     Linking.openURL(Platform.OS === 'android' ? 'tel:+254700000000' : 'telprompt:+254700000000');
   };
@@ -66,7 +108,7 @@ export function ParentDashboard({ onNavigate }: ParentDashboardProps) {
           <View style={styles.headerTop}>
             <View>
               <Text style={styles.greeting}>Good Morning ☀️</Text>
-              <Text style={styles.parentName}>Benny Omondi</Text>
+              <Text style={styles.parentName}>{parentName || 'Parent'}</Text>
             </View>
             <TouchableOpacity
               onPress={() => onNavigate('notifications')}
@@ -84,12 +126,12 @@ export function ParentDashboard({ onNavigate }: ParentDashboardProps) {
               <User2 size={24} color="#1B365D" />
             </View>
             <View style={styles.childInfo}>
-              <Text style={styles.childName}>Amani Omondi</Text>
-              <Text style={styles.childDetail}>Grade 5 · Nairobi Academy</Text>
+              <Text style={styles.childName}>{selectedChild ? `${selectedChild.firstName} ${selectedChild.lastName}` : '—'}</Text>
+              <Text style={styles.childDetail}>{selectedChild ? `${selectedChild.grade || ''} · ${selectedChild.schoolName || ''}` : ''}</Text>
             </View>
             <View style={styles.childBusInfo}>
-              <Text style={styles.childBusPlate}>Bus KCA 345G</Text>
-              <Text style={styles.childDriver}>Driver: James M.</Text>
+              <Text style={styles.childBusPlate}>{selectedChild?.routes?.[0]?.route?.bus?.registrationNumber ?? 'No bus assigned'}</Text>
+              <Text style={styles.childDriver}>{selectedChild?.routes?.[0]?.route ? `Driver: ${selectedChild?.routes?.[0]?.route?.driverName ?? 'N/A'}` : ''}</Text>
             </View>
           </View>
         </View>
