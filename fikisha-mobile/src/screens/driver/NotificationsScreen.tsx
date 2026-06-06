@@ -5,16 +5,16 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
-  StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   ArrowLeft,
-  Bus,
-  CheckCircle2,
+  Bell,
+  Users,
   AlertTriangle,
   MapPin,
   Clock,
+  CheckCircle2,
 } from 'lucide-react-native';
 
 interface NotificationsScreenProps {
@@ -37,73 +37,73 @@ interface Notification {
 const notifications: Notification[] = [
   {
     id: 1,
-    type: 'arriving',
-    icon: Bus,
+    type: 'route',
+    icon: MapPin,
     color: '#F5C542',
     bg: '#FFF8E1',
-    title: 'Bus arriving in 5 minutes',
-    body: "Bus KCA 345G is approaching Amani's pickup stop",
-    time: '7:07 AM',
+    title: 'Route assigned',
+    body: 'You have been assigned to Morning Route A for today',
+    time: '6:30 AM',
     date: 'Today',
     read: false,
   },
   {
     id: 2,
-    type: 'pickup',
-    icon: CheckCircle2,
-    color: '#22C55E',
-    bg: '#F0FDF4',
-    title: 'Amani was picked up',
-    body: 'Your child boarded the bus safely at Karen Estate Stop A',
-    time: '7:12 AM',
+    type: 'alert',
+    icon: AlertTriangle,
+    color: '#F97316',
+    bg: '#FFF7ED',
+    title: 'Traffic alert on your route',
+    body: 'Heavy traffic reported on Ngong Road. Expect 10-15 min delay',
+    time: '6:45 AM',
     date: 'Today',
     read: false,
   },
   {
     id: 3,
-    type: 'delay',
-    icon: AlertTriangle,
-    color: '#F97316',
-    bg: '#FFF7ED',
-    title: 'Minor delay reported',
-    body: 'Bus delayed by ~8 min due to traffic on Ngong Road',
-    time: '6:50 AM',
+    type: 'pickup',
+    icon: CheckCircle2,
+    color: '#22C55E',
+    bg: '#F0FDF4',
+    title: 'All students picked up',
+    body: '22 of 22 students boarded for Morning Route A',
+    time: '7:25 AM',
     date: 'Today',
     read: true,
   },
   {
     id: 4,
-    type: 'dropoff',
-    icon: MapPin,
-    color: '#22C55E',
-    bg: '#F0FDF4',
-    title: 'Amani arrived at school',
-    body: 'Dropped off at Nairobi Academy gate at 7:52 AM',
-    time: '7:52 AM',
-    date: 'Yesterday',
+    type: 'system',
+    icon: Bell,
+    color: '#6B7FA3',
+    bg: '#F7F9FC',
+    title: 'Vehicle check reminder',
+    body: 'Please complete your pre-trip vehicle inspection checklist',
+    time: '6:00 AM',
+    date: 'Today',
     read: true,
   },
   {
     id: 5,
-    type: 'pickup',
-    icon: CheckCircle2,
+    type: 'route',
+    icon: MapPin,
     color: '#22C55E',
     bg: '#F0FDF4',
-    title: 'Amani was picked up',
-    body: 'Your child boarded the afternoon bus home safely',
-    time: '4:15 PM',
+    title: 'Afternoon route completed',
+    body: 'All 22 students dropped off safely. Bus KCA 345G is back at depot',
+    time: '5:30 PM',
     date: 'Yesterday',
     read: true,
   },
   {
     id: 6,
-    type: 'completed',
-    icon: Clock,
-    color: '#6B7FA3',
-    bg: '#F7F9FC',
-    title: 'Route completed',
-    body: "Bus KCA 345G completed today's afternoon route",
-    time: '5:10 PM',
+    type: 'students',
+    icon: Users,
+    color: '#1B365D',
+    bg: '#EFF2F7',
+    title: 'Student list updated',
+    body: '2 new students added to your afternoon route',
+    time: '3:00 PM',
     date: 'Yesterday',
     read: true,
   },
@@ -118,13 +118,12 @@ function groupByDate(items: Notification[]): Record<string, Notification[]> {
   return groups;
 }
 
-export function ParentNotificationsScreen({ onBack }: NotificationsScreenProps) {
+export function DriverNotificationsScreen({ onBack }: NotificationsScreenProps) {
   const grouped = groupByDate(notifications);
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <StatusBar barStyle="light-content" backgroundColor="#1B365D" translucent />
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerRow}>
@@ -170,7 +169,6 @@ export function ParentNotificationsScreen({ onBack }: NotificationsScreenProps) 
                     },
                   ]}
                 >
-                  {/* Left column: icon + connector */}
                   <View style={styles.iconColumn}>
                     <View style={[styles.iconSquare, { backgroundColor: n.bg }]}>
                       <Icon size={18} color={n.color} />
@@ -178,7 +176,6 @@ export function ParentNotificationsScreen({ onBack }: NotificationsScreenProps) 
                     {!isLast && <View style={styles.connector} />}
                   </View>
 
-                  {/* Content */}
                   <View style={styles.notificationContent}>
                     <View style={styles.notificationHeader}>
                       <Text
@@ -213,10 +210,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F7F9FC',
   },
-  // Header
   header: {
     backgroundColor: '#1B365D',
-    paddingTop: 20,
+    paddingTop: 48,
     paddingBottom: 20,
     paddingHorizontal: 20,
   },
@@ -251,7 +247,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
-  // List
   scrollView: {
     flex: 1,
   },

@@ -1,22 +1,21 @@
-import apiClient from '@/lib/api'
-import { AxiosRequestConfig } from 'axios'
+import api from '@/lib/api';
 
-export async function get(url: string, config?: AxiosRequestConfig): Promise {
-  const response = await apiClient.get(url, config)
-  return response.data
+export async function get<T = any>(url: string, params?: Record<string, any>) {
+  const response = await api.get<T>(url, { params });
+  return response;
 }
 
-export async function post(url: string, data?: unknown, config?: AxiosRequestConfig): Promise {
-  const response = await apiClient.post(url, data, config)
-  return response.data
+export async function post<T = any>(url: string, data?: any) {
+  const response = await api.post<T>(url, data);
+  return response;
 }
 
-export async function patch(url: string, data?: unknown, config?: AxiosRequestConfig): Promise {
-  const response = await apiClient.patch(url, data, config)
-  return response.data
+export async function patch<T = any>(url: string, data?: any) {
+  const response = await api.patch<T>(url, data);
+  return response;
 }
 
-export async function del(url: string, config?: AxiosRequestConfig): Promise {
-  const response = await apiClient.delete(url, config)
-  return response.data
+export async function del<T = any>(url: string) {
+  const response = await api.delete<T>(url);
+  return response;
 }

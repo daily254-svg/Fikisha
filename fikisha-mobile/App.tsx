@@ -1,20 +1,62 @@
-import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+import React, { useState } from 'react';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { RootNavigation } from './src/navigation/RootNavigator';
+
+type Screen =
+  | 'splash'
+  | 'login'
+  | 'forgot-password'
+  | 'change-password'
+  | 'home'
+  | 'tracking'
+  | 'notifications'
+  | 'history'
+  | 'profile'
+  | 'driver-home'
+  | 'driver-route'
+  | 'driver-pickup'
+  | 'driver-incident';
 
 export default function App() {
+  const [screen, setScreen] = useState<Screen>('splash');
+  const [role, setRole] = useState<'parent' | 'driver'>('parent');
+  const [userPhone, setUserPhone] = useState('');
+
+  const navigate = (s: string) => setScreen(s as Screen);
+
+  const handleLogin = (r: 'parent' | 'driver', isFirstLogin: boolean, phone: string) => {
+    setRole(r);
+    setUserPhone(phone);
+
+    if (isFirstLogin) {
+      setScreen('change-password');
+    } else {
+      setScreen(r === 'parent' ? 'home' : 'driver-home');
+    }
+  };
+
+  const handlePasswordChanged = () => {
+    setScreen(role === 'parent' ? 'home' : 'driver-home');
+  };
+
+  const handleResetSent = () => {
+    setScreen('login');
+  };
+
+  const handleLogout = () => setScreen('login');
+
   return (
-    <View style={styles.container}>
-      <Text>Open up App.tsx to start working on your app!</Text>
-      <StatusBar style="auto" />
-    </View>
+    <SafeAreaProvider>
+      <RootNavigation
+        screen={screen}
+        role={role}
+        userPhone={userPhone}
+        onNavigate={navigate}
+        onLogin={handleLogin}
+        onPasswordChanged={handlePasswordChanged}
+        onResetSent={handleResetSent}
+        onLogout={handleLogout}
+      />
+    </SafeAreaProvider>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});

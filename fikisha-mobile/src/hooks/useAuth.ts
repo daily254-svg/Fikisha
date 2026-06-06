@@ -1,28 +1,32 @@
-import { useEffect } from 'react'
-import { useAuthStore } from '@/store/auth.store'
-import { authService } from '@/services/auth.service'
-import { LoginDto } from '@/types'
+import { useEffect } from 'react';
+import { useAuthStore } from '@/store/auth.store';
+import { authService } from '@/services/auth.service';
+import { LoginDto } from '@/types';
 
 export function useAuth() {
   const {
-    token, user, isAuthenticated,
-    isLoading, isFirstLogin,
-    setAuth, clearAuth, initAuth, setFirstLoginDone,
-  } = useAuthStore()
+    token,
+    user,
+    isAuthenticated,
+    isLoading,
+    isFirstLogin,
+    setAuth,
+    clearAuth,
+    initAuth,
+    setFirstLoginDone,
+  } = useAuthStore();
 
   useEffect(() => {
-    initAuth()
-  }, [])
+    initAuth();
+  }, []);
 
   const login = async (dto: LoginDto) => {
-    const { accessToken } = await authService.login(dto)
+    const { accessToken } = await authService.login(dto);
 
-    // Decode JWT payload
-    const base64 = accessToken.split('.')[1]
-    const payload = JSON.parse(atob(base64))
+    const base64 = accessToken.split('.')[1];
+    const payload = JSON.parse(atob(base64));
 
-    // Detect first login — password same as phone
-    const isFirst = dto.password === dto.phone
+    const isFirst = dto.password === dto.phone;
 
     await setAuth(
       accessToken,
@@ -34,16 +38,21 @@ export function useAuth() {
         name: '',
       },
       isFirst,
-    )
-  }
+    );
+  };
 
   const logout = async () => {
-    await clearAuth()
-  }
+    await clearAuth();
+  };
 
   return {
-    token, user, isAuthenticated,
-    isLoading, isFirstLogin,
-    login, logout, setFirstLoginDone,
-  }
+    token,
+    user,
+    isAuthenticated,
+    isLoading,
+    isFirstLogin,
+    login,
+    logout,
+    setFirstLoginDone,
+  };
 }

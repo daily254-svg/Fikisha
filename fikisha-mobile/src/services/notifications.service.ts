@@ -1,41 +1,41 @@
-import * as Notifications from 'expo-notifications'
-import * as Device from 'expo-device'
-import { authService } from './auth.service'
+import * as Notifications from 'expo-notifications';
+import * as Device from 'expo-device';
+import { authService } from './auth.service';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
     shouldPlaySound: true,
     shouldSetBadge: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
   }),
-})
+});
 
 export const notificationsService = {
-  registerForPushNotifications: async (): Promise => {
+  registerForPushNotifications: async (): Promise<string | null> => {
     if (!Device.isDevice) {
-      console.warn('Push notifications only work on physical devices')
-      return null
+      console.warn('Push notifications only work on physical devices');
+      return null;
     }
 
-    const { status: existingStatus } = await Notifications.getPermissionsAsync()
-    let finalStatus = existingStatus
+    const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    let finalStatus = existingStatus;
 
     if (existingStatus !== 'granted') {
-      const { status } = await Notifications.requestPermissionsAsync()
-      finalStatus = status
+      const { status } = await Notifications.requestPermissionsAsync();
+      finalStatus = status;
     }
 
     if (finalStatus !== 'granted') {
-      console.warn('Push notification permission denied')
-      return null
+      console.warn('Push notification permission denied');
+      return null;
     }
 
-    const token = (await Notifications.getExpoPushTokenAsync()).data
+    const token = (await Notifications.getExpoPushTokenAsync()).data;
+    await authService.updateFcmToken(token);
 
-    // Register token with backend
-    await authService.updateFcmToken(token)
-
-    return token
+    return token;
   },
 
   setupNotificationListeners: (
@@ -43,14 +43,14 @@ export const notificationsService = {
     onResponse: (response: Notifications.NotificationResponse) => void,
   ) => {
     const notificationListener =
-      Notifications.addNotificationReceivedListener(onNotification)
+      Notifications.addNotificationReceivedListener(onNotification);
 
     const responseListener =
-      Notifications.addNotificationResponseReceivedListener(onResponse)
+      Notifications.addNotificationResponseReceivedListener(onResponse);
 
     return () => {
-      Notifications.removeNotificationSubscription(notificationListener)
-      Notifications.removeNotificationSubscription(responseListener)
-    }
+      notificationListener.remove();
+      responseListener.remove();
+    };
   },
-}
+};

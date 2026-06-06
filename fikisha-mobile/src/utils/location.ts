@@ -1,26 +1,36 @@
 export function haversineDistance(
-  lat1: number, lng1: number,
-  lat2: number, lng2: number,
+  lat1: number,
+  lng1: number,
+  lat2: number,
+  lng2: number,
 ): number {
-  const R = 6371000
-  const φ1 = (lat1 * Math.PI) / 180
-  const φ2 = (lat2 * Math.PI) / 180
-  const Δφ = ((lat2 - lat1) * Math.PI) / 180
-  const Δλ = ((lng2 - lng1) * Math.PI) / 180
+  const R = 6371000;
+  const φ1 = (lat1 * Math.PI) / 180;
+  const φ2 = (lat2 * Math.PI) / 180;
+  const Δφ = ((lat2 - lat1) * Math.PI) / 180;
+  const Δλ = ((lng2 - lng1) * Math.PI) / 180;
   const a =
     Math.sin(Δφ / 2) ** 2 +
-    Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) ** 2
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+    Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
 export function formatDistance(meters: number): string {
-  if (meters  {
-  return (notification.request.content.data ?? {}) as Record
+  if (meters < 1000) {
+    return `${Math.round(meters)}m`;
+  }
+  return `${(meters / 1000).toFixed(1)}km`;
+}
+
+export function getNotificationData(
+  notification: { request: { content: { data?: Record<string, unknown> } } },
+): Record<string, unknown> {
+  return (notification.request.content.data ?? {}) as Record<string, unknown>;
 }
 
 export function getNotificationType(
-  notification: Notifications.Notification,
+  notification: { request: { content: { data?: Record<string, unknown> } } },
 ): string | null {
-  const data = getNotificationData(notification)
-  return data.type ?? null
+  const data = getNotificationData(notification);
+  return (data.type as string) ?? null;
 }

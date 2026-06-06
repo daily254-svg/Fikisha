@@ -1,18 +1,18 @@
-import { create } from 'zustand'
-import { GpsUpdate } from '@/types'
+import { create } from 'zustand';
+import { GpsUpdate } from '@/types';
 
 interface TrackingState {
-  busLocations: Record
-  isTracking: boolean
-  currentRouteId: string | null
+  busLocations: Record<string, GpsUpdate>;
+  isTracking: boolean;
+  currentRouteId: string | null;
 
-  updateBusLocation: (busId: string, location: GpsUpdate) => void
-  setTracking: (isTracking: boolean) => void
-  setCurrentRoute: (routeId: string | null) => void
-  clearTracking: () => void
+  updateBusLocation: (busId: string, location: GpsUpdate) => void;
+  setTracking: (isTracking: boolean) => void;
+  setCurrentRoute: (routeId: string | null) => void;
+  clearTracking: () => void;
 }
 
-export const useTrackingStore = create((set) => ({
+export const useTrackingStore = create<TrackingState>((set) => ({
   busLocations: {},
   isTracking: false,
   currentRouteId: null,
@@ -28,4 +28,4 @@ export const useTrackingStore = create((set) => ({
 
   clearTracking: () =>
     set({ busLocations: {}, isTracking: false, currentRouteId: null }),
-}))
+}));
