@@ -25,6 +25,10 @@ class EnvironmentVariables {
   @IsNumber()
   @Type(() => Number)
   PORT!: number;
+
+  @IsString()
+  @IsNotEmpty()
+  FIREBASE_SERVICE_ACCOUNT_PATH!: string;
 }
 
 export function validate(config: Record<string, unknown>) {

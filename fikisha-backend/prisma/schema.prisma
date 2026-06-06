@@ -45,6 +45,7 @@ model User {
   phone        String
   email        String?  @unique
   passwordHash String
+  fcmToken     String?
 
   role         UserRole
   status       String   @default("active")
