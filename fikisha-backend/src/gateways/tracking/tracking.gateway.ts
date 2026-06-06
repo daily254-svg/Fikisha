@@ -13,6 +13,7 @@ import { JwtService } from '@nestjs/jwt';
 import { TrackingService } from '../../modules/tracking/tracking.service';
 import { GpsUpdateDto } from './dto/gps-update.dto';
 import { RouteStartDto } from './dto/route-start.dto';
+import { StudentEventDto } from './dto/student-event.dto';
 
 interface AuthenticatedSocket extends Socket {
   user?: {
@@ -135,9 +136,36 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
     });
   }
 
-  @SubscribeMessage('test')
-  handleTest(@ConnectedSocket() client: AuthenticatedSocket): void {
-    this.logger.log(`Test event received from ${client.id}`)
+  @SubscribeMessage('student_pickup')
+  @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
+  async handleStudentPickup(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() payload: StudentEventDto,
+  ): Promise<void> {
+    if (!client.user) return;
+
+    const result = await this.trackingService.handleStudentPickup(
+      client.user.schoolId,
+      payload,
+    );
+
+    this.server.to(`parents:${client.user.schoolId}`).emit('student_picked_up', result);
+  }
+
+  @SubscribeMessage('student_dropoff')
+  @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
+  async handleStudentDropoff(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() payload: StudentEventDto,
+  ): Promise<void> {
+    if (!client.user) return;
+
+    const result = await this.trackingService.handleStudentDropoff(
+      client.user.schoolId,
+      payload,
+    );
+
+    this.server.to(`parents:${client.user.schoolId}`).emit('student_dropped_off', result);
   }
 
   private verifyToken(token: string): any | null {

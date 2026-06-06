@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { RedisService } from '../../redis/redis.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { NotFoundException } from '@nestjs/common';
 
 interface GpsPayload {
   busId: string;
@@ -18,6 +19,13 @@ interface RouteStop {
   latitude: number;
   longitude: number;
   radiusMeters: number;
+}
+
+interface StudentEventPayload {
+  busId: string;
+  studentId: string;
+  lat?: number;
+  lng?: number;
 }
 
 @Injectable()
@@ -102,6 +110,88 @@ export class TrackingService {
     );
 
     return { busId: payload.busId, routeId: payload.routeId };
+  }
+
+  async getLocationHistory(schoolId: string, busId: string, limit: number = 50) {
+    const bus = await this.prisma.bus.findUnique({
+      where: { id: busId },
+    });
+
+    if (!bus || bus.schoolId !== schoolId) {
+      throw new NotFoundException(`Bus with ID ${busId} not found`);
+    }
+
+    return this.prisma.busLocationHistory.findMany({
+      where: { busId, schoolId },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+    });
+  }
+
+  async handleStudentPickup(schoolId: string, payload: StudentEventPayload) {
+    const student = await this.prisma.student.findUnique({
+      where: { id: payload.studentId },
+    });
+
+    if (!student || student.schoolId !== schoolId) {
+      throw new NotFoundException(`Student with ID ${payload.studentId} not found`);
+    }
+
+    const bus = await this.prisma.bus.findUnique({
+      where: { id: payload.busId },
+    });
+
+    if (!bus || bus.schoolId !== schoolId) {
+      throw new NotFoundException(`Bus with ID ${payload.busId} not found`);
+    }
+
+    const event = await this.prisma.transportEvent.create({
+      data: {
+        schoolId,
+        studentId: payload.studentId,
+        busId: payload.busId,
+        type: 'PICKED_UP',
+        latitude: payload.lat,
+        longitude: payload.lng,
+      },
+    });
+
+    await this.notificationsService.sendPickupNotification(payload.studentId);
+
+    return event;
+  }
+
+  async handleStudentDropoff(schoolId: string, payload: StudentEventPayload) {
+    const student = await this.prisma.student.findUnique({
+      where: { id: payload.studentId },
+    });
+
+    if (!student || student.schoolId !== schoolId) {
+      throw new NotFoundException(`Student with ID ${payload.studentId} not found`);
+    }
+
+    const bus = await this.prisma.bus.findUnique({
+      where: { id: payload.busId },
+    });
+
+    if (!bus || bus.schoolId !== schoolId) {
+      throw new NotFoundException(`Bus with ID ${payload.busId} not found`);
+    }
+
+    const event = await this.prisma.transportEvent.create({
+      data: {
+        schoolId,
+        studentId: payload.studentId,
+        busId: payload.busId,
+        type: 'DROPPED_OFF',
+        latitude: payload.lat,
+        longitude: payload.lng,
+      },
+    });
+
+    await this.notificationsService.sendDropoffNotification(payload.studentId);
+
+    return event;
   }
 
   async handleRouteEnd(_schoolId: string, busId: string): Promise<void> {

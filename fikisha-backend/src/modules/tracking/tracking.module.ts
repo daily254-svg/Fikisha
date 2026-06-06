@@ -3,6 +3,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TrackingGateway } from '../../gateways/tracking/tracking.gateway';
 import { TrackingService } from './tracking.service';
+import { TrackingController } from './tracking.controller';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { TrackingService } from './tracking.service';
       }),
     }),
   ],
+  controllers: [TrackingController],
   providers: [TrackingGateway, TrackingService],
   exports: [TrackingService],
 })
