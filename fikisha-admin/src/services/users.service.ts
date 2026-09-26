@@ -1,19 +1,17 @@
 import { get, post, patch } from './api'
-import { User, Driver, Parent, CreateDriverDto, CreateParentDto, UpdateUserDto } from '@/types'
+import { User, CreateDriverDto, CreateParentDto, UpdateUserDto } from '@/types'
 
 export const usersService = {
-  findAll: () =>
-    get('/users'),
+  findAll: () => get<User[]>('/users'),
 
-  findById: (userId: string) =>
-    get(`/users/${userId}`),
+  findById: (userId: string) => get<User>(`/users/${userId}`),
 
   createDriver: (dto: CreateDriverDto) =>
-    post('/users/drivers', dto),
+    post<{ user: User; driver: unknown }>('/users/drivers', dto),
 
   createParent: (dto: CreateParentDto) =>
-    post('/users/parents', dto),
+    post<{ user: User; parent: unknown }>('/users/parents', dto),
 
   update: (userId: string, dto: UpdateUserDto) =>
-    patch(`/users/${userId}`, dto),
+    patch<User>(`/users/${userId}`, dto),
 }

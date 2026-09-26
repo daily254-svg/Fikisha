@@ -1,22 +1,22 @@
 import api from '@/lib/axios'
 import { AxiosRequestConfig } from 'axios'
 
-export async function get(url: string, config?: AxiosRequestConfig): Promise {
-  const response = await api.get(url, config)
+export async function get<T = unknown>(url: string, config?: AxiosRequestConfig): Promise<T> {
+  const response = await api.get<T>(url, config)
   return response.data
 }
 
-export async function post(url: string, data?: unknown, config?: AxiosRequestConfig): Promise {
-  const response = await api.post(url, data, config)
+export async function post<T = unknown>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T> {
+  const response = await api.post<T>(url, data, config)
   return response.data
 }
 
-export async function patch(url: string, data?: unknown, config?: AxiosRequestConfig): Promise {
-  const response = await api.patch(url, data, config)
+export async function patch<T = unknown>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T> {
+  const response = await api.patch<T>(url, data, config)
   return response.data
 }
 
-export async function del(url: string, config?: AxiosRequestConfig): Promise {
-  const response = await api.delete(url, config)
+export async function del<T = unknown>(url: string, config?: AxiosRequestConfig): Promise<T> {
+  const response = await api.delete<T>(url, config)
   return response.data
 }

@@ -5,16 +5,18 @@ interface AuthState {
   token: string | null
   user: AuthUser | null
   isAuthenticated: boolean
+  hasHydrated: boolean
 
   setAuth: (token: string, user: AuthUser) => void
   clearAuth: () => void
   initAuth: () => void
 }
 
-export const useAuthStore = create((set) => ({
+export const useAuthStore = create<AuthState>((set) => ({
   token: null,
   user: null,
   isAuthenticated: false,
+  hasHydrated: false,
 
   setAuth: (token, user) => {
     localStorage.setItem('fikisha_token', token)
@@ -35,11 +37,13 @@ export const useAuthStore = create((set) => ({
     if (token && userStr) {
       try {
         const user = JSON.parse(userStr) as AuthUser
-        set({ token, user, isAuthenticated: true })
+        set({ token, user, isAuthenticated: true, hasHydrated: true })
+        return
       } catch {
         localStorage.removeItem('fikisha_token')
         localStorage.removeItem('fikisha_user')
       }
     }
+    set({ hasHydrated: true })
   },
 }))

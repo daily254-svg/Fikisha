@@ -2,15 +2,12 @@ import { get, post, patch } from './api'
 import { School, CreateSchoolDto, UpdateSchoolDto } from '@/types'
 
 export const schoolsService = {
-  findAll: () =>
-    get('/schools'),
+  findAll: () => get<School[]>('/schools'),
 
-  findById: (schoolId: string) =>
-    get(`/schools/${schoolId}`),
+  findById: (schoolId: string) => get<School>(`/schools/${schoolId}`),
 
-  create: (dto: CreateSchoolDto) =>
-    post('/schools', dto),
+  create: (dto: CreateSchoolDto) => post<School>('/schools', dto),
 
   update: (schoolId: string, dto: UpdateSchoolDto) =>
-    patch(`/schools/${schoolId}`, dto),
+    patch<School>(`/schools/${schoolId}`, dto),
 }

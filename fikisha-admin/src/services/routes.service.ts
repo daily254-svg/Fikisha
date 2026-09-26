@@ -1,28 +1,32 @@
 import { get, post, patch, del } from './api'
-import { Route, CreateRouteDto, UpdateRouteDto, CreateStopDto, AssignStudentDto } from '@/types'
+import {
+  Route,
+  CreateRouteDto,
+  UpdateRouteDto,
+  CreateStopDto,
+  AssignStudentDto,
+  RouteStop,
+} from '@/types'
 
 export const routesService = {
-  findAll: () =>
-    get('/routes'),
+  findAll: () => get<Route[]>('/routes'),
 
-  findById: (routeId: string) =>
-    get(`/routes/${routeId}`),
+  findById: (routeId: string) => get<Route>(`/routes/${routeId}`),
 
-  create: (dto: CreateRouteDto) =>
-    post('/routes', dto),
+  create: (dto: CreateRouteDto) => post<Route>('/routes', dto),
 
   update: (routeId: string, dto: UpdateRouteDto) =>
-    patch(`/routes/${routeId}`, dto),
+    patch<Route>(`/routes/${routeId}`, dto),
 
   addStop: (routeId: string, dto: CreateStopDto) =>
-    post(`/routes/${routeId}/stops`, dto),
+    post<RouteStop>(`/routes/${routeId}/stops`, dto),
 
   removeStop: (routeId: string, stopId: string) =>
-    del(`/routes/${routeId}/stops/${stopId}`),
+    del<{ message: string }>(`/routes/${routeId}/stops/${stopId}`),
 
   assignStudent: (routeId: string, dto: AssignStudentDto) =>
-    post(`/routes/${routeId}/students`, dto),
+    post<unknown>(`/routes/${routeId}/students`, dto),
 
   unassignStudent: (routeId: string, studentId: string) =>
-    del(`/routes/${routeId}/students/${studentId}`),
+    del<{ message: string }>(`/routes/${routeId}/students/${studentId}`),
 }

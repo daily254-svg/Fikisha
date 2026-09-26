@@ -5,19 +5,37 @@ export interface User {
   schoolId: string
   name: string
   phone: string
-  email?: string
+  email?: string | null
   role: UserRole
   status: string
   createdAt: string
   updatedAt: string
+  driver?: DriverProfile | null
+  parent?: ParentProfile | null
+}
+
+export interface DriverProfile {
+  id: string
+  userId: string
+  schoolId: string
+  licenseNo?: string | null
+  employeeNo?: string | null
+  createdAt: string
+}
+
+export interface ParentProfile {
+  id: string
+  userId: string
+  schoolId: string
+  createdAt: string
 }
 
 export interface Driver {
   id: string
   userId: string
   schoolId: string
-  licenseNo?: string
-  employeeNo?: string
+  licenseNo?: string | null
+  employeeNo?: string | null
   createdAt: string
   user?: User
 }

@@ -4,9 +4,10 @@ export interface Student {
   admissionNo: string
   firstName: string
   lastName: string
-  grade?: string
-  gender?: string
+  grade?: string | null
+  gender?: string | null
   createdAt: string
+  parents?: ParentStudent[]
 }
 
 export interface ParentStudent {
@@ -16,6 +17,18 @@ export interface ParentStudent {
   relationship: string
   isPrimary: boolean
   createdAt: string
+  parent?: {
+    id: string
+    userId: string
+    schoolId: string
+    createdAt: string
+    user: {
+      id: string
+      name: string
+      phone: string
+      email?: string | null
+    } | null
+  }
 }
 
 export interface CreateStudentDto {
@@ -26,7 +39,7 @@ export interface CreateStudentDto {
   gender?: string
 }
 
-export interface UpdateStudentDto extends Partial {}
+export interface UpdateStudentDto extends Partial<CreateStudentDto> {}
 
 export interface LinkParentDto {
   parentId: string

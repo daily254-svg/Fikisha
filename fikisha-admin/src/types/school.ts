@@ -18,4 +18,4 @@ export interface CreateSchoolDto {
   plan?: string
 }
 
-export interface UpdateSchoolDto extends Partial {}
+export interface UpdateSchoolDto extends Partial<CreateSchoolDto> {}

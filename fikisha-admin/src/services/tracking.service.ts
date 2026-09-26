@@ -1,12 +1,12 @@
 import { get } from './api'
-import { LiveLocation, TransportEvent } from '@/types'
+import { LiveLocation, BusLocationHistory, TransportEvent } from '@/types'
 
 export const trackingService = {
   getBusLocation: (busId: string) =>
-    get(`/tracking/buses/${busId}/location`),
+    get<LiveLocation | null>(`/tracking/buses/${busId}/location`),
 
   getBusHistory: (busId: string, limit?: number) =>
-    get(`/tracking/buses/${busId}/history`, {
+    get<BusLocationHistory[]>(`/tracking/buses/${busId}/history`, {
       params: { limit },
     }),
 
@@ -16,6 +16,5 @@ export const trackingService = {
     type?: string
     date?: string
     limit?: number
-  }) =>
-    get('/transport-events', { params: filters }),
+  }) => get<TransportEvent[]>('/transport-events', { params: filters }),
 }

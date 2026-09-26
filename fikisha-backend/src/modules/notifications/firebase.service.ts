@@ -6,6 +6,7 @@ import * as fs from 'fs';
 @Injectable()
 export class FirebaseService implements OnModuleInit {
   private readonly logger = new Logger(FirebaseService.name);
+  private enabled = false;
 
   constructor(private readonly configService: ConfigService) {}
 
@@ -15,7 +16,10 @@ export class FirebaseService implements OnModuleInit {
     );
 
     if (!serviceAccountPath || !fs.existsSync(serviceAccountPath)) {
-      throw new Error(`Firebase service account not found at: ${serviceAccountPath}`);
+      this.logger.warn(
+        `Firebase service account not found at: ${serviceAccountPath}. Push notifications are disabled.`,
+      );
+      return;
     }
 
     const serviceAccount = JSON.parse(
@@ -26,8 +30,9 @@ export class FirebaseService implements OnModuleInit {
       admin.initializeApp({
         credential: admin.credential.cert(serviceAccount),
       });
-      this.logger.log('Firebase Admin SDK initialized');
     }
+    this.enabled = true;
+    this.logger.log('Firebase Admin SDK initialized');
   }
 
   async sendToDevice(
@@ -35,6 +40,7 @@ export class FirebaseService implements OnModuleInit {
     notification: { title: string; body: string },
     data?: Record<string, string>,
   ): Promise<boolean> {
+    if (!this.enabled) return false;
     try {
       await admin.messaging().send({
         token: fcmToken,
@@ -64,7 +70,7 @@ export class FirebaseService implements OnModuleInit {
     notification: { title: string; body: string },
     data?: Record<string, string>,
   ): Promise<void> {
-    if (fcmTokens.length === 0) return;
+    if (!this.enabled || fcmTokens.length === 0) return;
 
     const messages = fcmTokens.map((token) => ({
       token,

@@ -1,4 +1,5 @@
 import { Driver } from './user'
+import { LiveLocation } from './tracking'
 
 export interface Bus {
   id: string
@@ -30,20 +31,12 @@ export interface BusLocation {
   updatedAt: string
 }
 
-export interface LiveLocation {
-  lat: number
-  lng: number
-  speed: number
-  heading: number
-  updatedAt: string
-}
-
 export interface CreateBusDto {
   registrationNumber: string
   capacity?: number
 }
 
-export interface UpdateBusDto extends Partial {}
+export interface UpdateBusDto extends Partial<CreateBusDto> {}
 
 export interface AssignDriverDto {
   driverId: string

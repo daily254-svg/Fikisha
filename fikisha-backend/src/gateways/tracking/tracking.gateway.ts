@@ -68,7 +68,9 @@ export class TrackingGateway
       if (role === 'DRIVER') {
         client.join(`driver:${sub}`);
         client.join(`school:${schoolId}:drivers`);
-      } else if (role === 'PARENT') {
+      } else if (role === 'PARENT' || role === 'SCHOOL_ADMIN') {
+        // School admins also join the parents room so the admin dashboard
+        // receives the same live tracking broadcasts (bus location, pickup/dropoff, route events).
         client.join(`parents:${schoolId}`);
       }
 

@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { GpsUpdate } from '@/types'
 
 interface TrackingState {
-  busLocations: Record
+  busLocations: Record<string, GpsUpdate>
   activeBuses: string[]
 
   updateBusLocation: (busId: string, location: GpsUpdate) => void
@@ -10,7 +10,7 @@ interface TrackingState {
   clearTracking: () => void
 }
 
-export const useTrackingStore = create((set) => ({
+export const useTrackingStore = create<TrackingState>((set) => ({
   busLocations: {},
   activeBuses: [],
 

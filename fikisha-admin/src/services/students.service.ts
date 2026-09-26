@@ -1,22 +1,19 @@
 import { get, post, patch, del } from './api'
-import { Student, CreateStudentDto, UpdateStudentDto, LinkParentDto } from '@/types'
+import { Student, CreateStudentDto, UpdateStudentDto, LinkParentDto, ParentStudent } from '@/types'
 
 export const studentsService = {
-  findAll: () =>
-    get('/students'),
+  findAll: () => get<Student[]>('/students'),
 
-  findById: (studentId: string) =>
-    get(`/students/${studentId}`),
+  findById: (studentId: string) => get<Student>(`/students/${studentId}`),
 
-  create: (dto: CreateStudentDto) =>
-    post('/students', dto),
+  create: (dto: CreateStudentDto) => post<Student>('/students', dto),
 
   update: (studentId: string, dto: UpdateStudentDto) =>
-    patch(`/students/${studentId}`, dto),
+    patch<Student>(`/students/${studentId}`, dto),
 
   linkParent: (studentId: string, dto: LinkParentDto) =>
-    post(`/students/${studentId}/parents`, dto),
+    post<ParentStudent>(`/students/${studentId}/parents`, dto),
 
   unlinkParent: (studentId: string, parentId: string) =>
-    del(`/students/${studentId}/parents/${parentId}`),
+    del<{ message: string }>(`/students/${studentId}/parents/${parentId}`),
 }

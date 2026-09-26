@@ -1,22 +1,18 @@
 import { get, post, patch, del } from './api'
-import { Bus, CreateBusDto, UpdateBusDto, AssignDriverDto } from '@/types'
+import { Bus, CreateBusDto, UpdateBusDto, AssignDriverDto, BusAssignment } from '@/types'
 
 export const busesService = {
-  findAll: () =>
-    get('/buses'),
+  findAll: () => get<Bus[]>('/buses'),
 
-  findById: (busId: string) =>
-    get(`/buses/${busId}`),
+  findById: (busId: string) => get<Bus>(`/buses/${busId}`),
 
-  create: (dto: CreateBusDto) =>
-    post('/buses', dto),
+  create: (dto: CreateBusDto) => post<Bus>('/buses', dto),
 
-  update: (busId: string, dto: UpdateBusDto) =>
-    patch(`/buses/${busId}`, dto),
+  update: (busId: string, dto: UpdateBusDto) => patch<Bus>(`/buses/${busId}`, dto),
 
   assignDriver: (busId: string, dto: AssignDriverDto) =>
-    post(`/buses/${busId}/assign-driver`, dto),
+    post<BusAssignment>(`/buses/${busId}/assign-driver`, dto),
 
   unassignDriver: (busId: string) =>
-    del(`/buses/${busId}/unassign-driver`),
+    del<{ message: string }>(`/buses/${busId}/unassign-driver`),
 }

@@ -8,7 +8,8 @@ import { LoginDto } from '@/types'
 
 export function useAuth() {
   const router = useRouter()
-  const { token, user, isAuthenticated, setAuth, clearAuth, initAuth } = useAuthStore()
+  const { token, user, isAuthenticated, hasHydrated, setAuth, clearAuth, initAuth } =
+    useAuthStore()
 
   useEffect(() => {
     initAuth()
@@ -18,7 +19,6 @@ export function useAuth() {
   useEffect(() => {
     const handleExpired = () => {
       clearAuth()
-      // Toast shown by the listener in layout
       router.push('/login')
     }
 
@@ -29,16 +29,24 @@ export function useAuth() {
   const login = async (dto: LoginDto) => {
     const { accessToken } = await authService.login(dto)
 
+    if (!accessToken) {
+      throw new Error('Login failed')
+    }
+
     // Decode payload from JWT
     const base64 = accessToken.split('.')[1]
     const payload = JSON.parse(atob(base64))
+
+    if (payload.role !== 'SCHOOL_ADMIN') {
+      throw new Error('Only school administrators can access this dashboard')
+    }
 
     setAuth(accessToken, {
       id: payload.sub,
       schoolId: payload.schoolId,
       role: payload.role,
       phone: payload.phone,
-      name: '',  // fetched separately if needed
+      name: '',
     })
 
     router.push('/dashboard')
@@ -49,5 +57,5 @@ export function useAuth() {
     router.push('/login')
   }
 
-  return { token, user, isAuthenticated, login, logout }
+  return { token, user, isAuthenticated, hasHydrated, login, logout }
 }

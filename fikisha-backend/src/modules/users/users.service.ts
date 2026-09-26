@@ -80,6 +80,7 @@ export class UsersService {
   async findAll(schoolId: string) {
     const users = await this.prisma.user.findMany({
       where: { schoolId },
+      include: { driver: true, parent: true },
     });
 
     return users.map((user) => this.sanitizeUser(user));
@@ -88,6 +89,7 @@ export class UsersService {
   async findById(schoolId: string, userId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
+      include: { driver: true, parent: true },
     });
 
     if (!user || user.schoolId !== schoolId) {

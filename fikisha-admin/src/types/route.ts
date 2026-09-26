@@ -5,9 +5,24 @@ export interface Route {
   schoolId: string
   name: string
   direction: RouteDirection
-  busId?: string
+  busId?: string | null
   createdAt: string
   stops?: RouteStop[]
+  bus?: { id: string; registrationNumber: string } | null
+  students?: StudentRoute[]
+}
+
+export interface StudentRoute {
+  studentId: string
+  routeId: string
+  pickupStopId?: string | null
+  dropoffStopId?: string | null
+  student?: {
+    id: string
+    firstName: string
+    lastName: string
+    admissionNo: string
+  }
 }
 
 export interface RouteStop {
