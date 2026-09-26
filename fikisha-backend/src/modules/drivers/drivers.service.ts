@@ -95,6 +95,9 @@ export class DriversService {
         busId: assignment.bus.id,
         schoolId: driver.schoolId,
       },
+      include: {
+        stops: { orderBy: { sequence: 'asc' } },
+      },
     });
 
     // For each route get students
@@ -122,9 +125,13 @@ export class DriversService {
             id: route.id,
             name: route.name,
             direction: route.direction,
+            stops: route.stops,
           },
           students: studentRoutes.map((sr) => ({
             ...sr.student,
+            studentRouteId: sr.id,
+            pickupStopId: sr.pickupStopId,
+            dropoffStopId: sr.dropoffStopId,
             parents: sr.student.parents.map((ps) => ({
               ...ps,
               parent: {

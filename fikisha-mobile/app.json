@@ -27,7 +27,13 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Fikisha uses your location to share your bus's live position with parents while a route is active."
+        }
+      ]
     ]
   }
 }

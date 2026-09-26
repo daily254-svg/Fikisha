@@ -194,6 +194,39 @@ export class TrackingService {
     return event;
   }
 
+  async handleStudentAbsent(schoolId: string, payload: StudentEventPayload) {
+    const student = await this.prisma.student.findUnique({
+      where: { id: payload.studentId },
+    });
+
+    if (!student || student.schoolId !== schoolId) {
+      throw new NotFoundException(`Student with ID ${payload.studentId} not found`);
+    }
+
+    const bus = await this.prisma.bus.findUnique({
+      where: { id: payload.busId },
+    });
+
+    if (!bus || bus.schoolId !== schoolId) {
+      throw new NotFoundException(`Bus with ID ${payload.busId} not found`);
+    }
+
+    const event = await this.prisma.transportEvent.create({
+      data: {
+        schoolId,
+        studentId: payload.studentId,
+        busId: payload.busId,
+        type: 'ABSENT',
+        latitude: payload.lat,
+        longitude: payload.lng,
+      },
+    });
+
+    await this.notificationsService.sendAbsentNotification(payload.studentId);
+
+    return event;
+  }
+
   async handleRouteEnd(_schoolId: string, busId: string): Promise<void> {
     await this.redisService.del(`bus:${busId}:route`);
   }

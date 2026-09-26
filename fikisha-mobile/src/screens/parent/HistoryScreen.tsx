@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -6,254 +6,271 @@ import {
   StyleSheet,
   ScrollView,
   StatusBar,
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Svg, { Circle, Line, Path } from 'react-native-svg';
-import {
-  ArrowLeft,
-  CheckCircle2,
-  Clock,
-  MapPin,
-} from 'lucide-react-native';
+import { ArrowLeft, CheckCircle2, Clock, AlertTriangle, Sun, Moon } from 'lucide-react-native';
+import { trackingService } from '@/services/tracking.service';
+import type { TransportEvent } from '@/types';
 
 interface HistoryScreenProps {
   onBack: () => void;
 }
 
+type Bucket = 'Morning' | 'Afternoon';
+
 interface Trip {
-  type: string;
-  pickup: string | null;
-  arrival: string | null;
-  dropoff: string | null;
-  status: string;
-  statusColor: string;
+  bucket: Bucket;
+  pickup?: TransportEvent;
+  dropoff?: TransportEvent;
+  absent?: TransportEvent;
+  busRegistration?: string;
 }
 
-interface DayData {
-  date: string;
+interface DayGroup {
+  dateKey: string;
+  dateLabel: string;
   trips: Trip[];
 }
 
-const historyData: DayData[] = [
-  {
-    date: 'Wed, 4 Jun 2025',
-    trips: [
-      {
-        type: 'Morning',
-        pickup: '7:12 AM',
-        arrival: '7:48 AM',
-        dropoff: null,
-        status: 'In Progress',
-        statusColor: '#F5C542',
-      },
-    ],
-  },
-  {
-    date: 'Tue, 3 Jun 2025',
-    trips: [
-      {
-        type: 'Morning',
-        pickup: '7:08 AM',
-        arrival: '7:44 AM',
-        dropoff: null,
-        status: 'Completed',
-        statusColor: '#22C55E',
-      },
-      {
-        type: 'Afternoon',
-        pickup: '4:15 PM',
-        arrival: null,
-        dropoff: '4:52 PM',
-        status: 'Completed',
-        statusColor: '#22C55E',
-      },
-    ],
-  },
-  {
-    date: 'Mon, 2 Jun 2025',
-    trips: [
-      {
-        type: 'Morning',
-        pickup: '7:15 AM',
-        arrival: '7:53 AM',
-        dropoff: null,
-        status: 'Completed',
-        statusColor: '#22C55E',
-      },
-      {
-        type: 'Afternoon',
-        pickup: '4:18 PM',
-        arrival: null,
-        dropoff: '4:58 PM',
-        status: 'Delayed',
-        statusColor: '#F97316',
-      },
-    ],
-  },
-  {
-    date: 'Fri, 30 May 2025',
-    trips: [
-      {
-        type: 'Morning',
-        pickup: '7:10 AM',
-        arrival: '7:46 AM',
-        dropoff: null,
-        status: 'Completed',
-        statusColor: '#22C55E',
-      },
-      {
-        type: 'Afternoon',
-        pickup: '4:12 PM',
-        arrival: null,
-        dropoff: '4:48 PM',
-        status: 'Completed',
-        statusColor: '#22C55E',
-      },
-    ],
-  },
-];
+function bucketFor(iso: string): Bucket {
+  return new Date(iso).getHours() < 13 ? 'Morning' : 'Afternoon';
+}
+
+function dateKeyFor(iso: string): string {
+  return new Date(iso).toDateString();
+}
+
+function formatTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+}
+
+function formatDateLabel(iso: string): string {
+  const date = new Date(iso);
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+  if (date.toDateString() === today.toDateString()) return 'Today';
+  if (date.toDateString() === yesterday.toDateString()) return 'Yesterday';
+  return date.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function groupIntoDays(events: TransportEvent[]): DayGroup[] {
+  const byDate = new Map<string, TransportEvent[]>();
+  for (const e of events) {
+    const key = dateKeyFor(e.createdAt);
+    if (!byDate.has(key)) byDate.set(key, []);
+    byDate.get(key)!.push(e);
+  }
+
+  const days: DayGroup[] = [];
+  for (const [dateKey, dayEvents] of byDate.entries()) {
+    const byBucket = new Map<Bucket, Trip>();
+    for (const e of dayEvents) {
+      const bucket = bucketFor(e.createdAt);
+      const trip = byBucket.get(bucket) ?? { bucket };
+      if (e.type === 'PICKED_UP') trip.pickup = e;
+      else if (e.type === 'DROPPED_OFF') trip.dropoff = e;
+      else if (e.type === 'ABSENT') trip.absent = e;
+      trip.busRegistration = e.bus?.registrationNumber ?? trip.busRegistration;
+      byBucket.set(bucket, trip);
+    }
+    const trips = Array.from(byBucket.values()).sort((a, b) =>
+      a.bucket === b.bucket ? 0 : a.bucket === 'Morning' ? -1 : 1,
+    );
+    days.push({ dateKey, dateLabel: formatDateLabel(dayEvents[0].createdAt), trips });
+  }
+
+  return days.sort((a, b) => (a.dateKey < b.dateKey ? 1 : -1));
+}
+
+function tripStatus(trip: Trip): { label: string; color: string } {
+  if (trip.absent) return { label: 'Absent', color: '#EF4444' };
+  if (trip.pickup && trip.dropoff) return { label: 'Completed', color: '#22C55E' };
+  if (trip.pickup) return { label: 'In Progress', color: '#F5C542' };
+  return { label: 'Completed', color: '#22C55E' };
+}
 
 export function HistoryScreen({ onBack }: HistoryScreenProps) {
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [events, setEvents] = useState<TransportEvent[]>([]);
+
+  const load = async () => {
+    try {
+      const res = await trackingService.getTransportEvents({ limit: 200 });
+      setEvents(res.data);
+    } catch (e) {
+      console.error('Failed to load transport history', e);
+    }
+  };
+
+  useEffect(() => {
+    (async () => {
+      setIsLoading(true);
+      await load();
+      setIsLoading(false);
+    })();
+  }, []);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await load();
+    setIsRefreshing(false);
+  };
+
+  const days = useMemo(() => groupIntoDays(events), [events]);
+
+  const stats = useMemo(() => {
+    const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    const recentTrips = days
+      .filter((d) => new Date(d.dateKey).getTime() >= weekAgo)
+      .flatMap((d) => d.trips);
+
+    const morningPickups = events.filter(
+      (e) => e.type === 'PICKED_UP' && bucketFor(e.createdAt) === 'Morning',
+    );
+    let avgPickup = '—';
+    if (morningPickups.length > 0) {
+      const avgMinutes =
+        morningPickups.reduce((sum, e) => {
+          const d = new Date(e.createdAt);
+          return sum + d.getHours() * 60 + d.getMinutes();
+        }, 0) / morningPickups.length;
+      const h = Math.floor(avgMinutes / 60);
+      const m = Math.round(avgMinutes % 60);
+      const period = h >= 12 ? 'PM' : 'AM';
+      const h12 = h % 12 === 0 ? 12 : h % 12;
+      avgPickup = `${h12}:${String(m).padStart(2, '0')} ${period}`;
+    }
+
+    return {
+      weekTrips: recentTrips.length,
+      avgPickup,
+    };
+  }, [days, events]);
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar barStyle="light-content" backgroundColor="#1B365D" translucent />
-      {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerTop}>
-          <TouchableOpacity
-            onPress={onBack}
-            style={styles.backButton}
-            activeOpacity={0.8}
-          >
+          <TouchableOpacity onPress={onBack} style={styles.backButton} activeOpacity={0.8}>
             <ArrowLeft size={18} color="#ffffff" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Transport History</Text>
         </View>
 
-        {/* Stats summary */}
         <View style={styles.statsRow}>
           {[
-            { label: 'This Week', value: '8', sub: 'trips' },
-            { label: 'On Time', value: '87%', sub: 'rate' },
-            { label: 'Avg Pickup', value: '7:11', sub: 'AM' },
+            { label: 'This week', value: String(stats.weekTrips), sub: 'trips' },
+            { label: 'Avg pickup', value: stats.avgPickup, sub: '' },
           ].map((s, i) => (
             <View key={i} style={styles.statCard}>
               <Text style={styles.statValue}>{s.value}</Text>
-              <Text style={styles.statDetail}>
-                {s.label} · {s.sub}
-              </Text>
+              <Text style={styles.statDetail}>{s.sub ? `${s.label} · ${s.sub}` : s.label}</Text>
             </View>
           ))}
         </View>
       </View>
 
-      {/* History list */}
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {historyData.map((day, di) => (
-          <View key={di} style={styles.daySection}>
-            <Text style={styles.dateLabel}>{day.date}</Text>
-            {day.trips.map((trip, ti) => (
-              <View key={ti} style={styles.tripCard}>
-                {/* Trip header */}
-                <View style={styles.tripHeader}>
-                  <View style={styles.tripTypeRow}>
-                    <View
-                      style={[
-                        styles.tripTypeIcon,
-                        {
-                          backgroundColor:
-                            trip.type === 'Morning' ? '#FFF8E1' : '#EFF2F7',
-                        },
-                      ]}
-                    >
-                      {trip.type === 'Morning' ? (
-                        <Svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                          <Circle cx="7" cy="7" r="3.5" fill="#F5C542" />
-                          <Line x1="7" y1="1" x2="7" y2="3" stroke="#F5C542" strokeWidth="1.5" strokeLinecap="round" />
-                          <Line x1="7" y1="11" x2="7" y2="13" stroke="#F5C542" strokeWidth="1.5" strokeLinecap="round" />
-                          <Line x1="1" y1="7" x2="3" y2="7" stroke="#F5C542" strokeWidth="1.5" strokeLinecap="round" />
-                          <Line x1="11" y1="7" x2="13" y2="7" stroke="#F5C542" strokeWidth="1.5" strokeLinecap="round" />
-                        </Svg>
+      {isLoading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator color="#1B365D" size="large" />
+        </View>
+      ) : (
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} />}
+        >
+          {days.length === 0 && (
+            <Text style={styles.emptyText}>No transport history yet.</Text>
+          )}
+          {days.map((day) => (
+            <View key={day.dateKey} style={styles.daySection}>
+              <Text style={styles.dateLabel}>{day.dateLabel}</Text>
+              {day.trips.map((trip, ti) => {
+                const status = tripStatus(trip);
+                return (
+                  <View key={ti} style={styles.tripCard}>
+                    <View style={styles.tripHeader}>
+                      <View style={styles.tripTypeRow}>
+                        <View
+                          style={[
+                            styles.tripTypeIcon,
+                            { backgroundColor: trip.bucket === 'Morning' ? '#FFF8E1' : '#EFF2F7' },
+                          ]}
+                        >
+                          {trip.bucket === 'Morning' ? (
+                            <Sun size={14} color="#F5C542" />
+                          ) : (
+                            <Moon size={14} color="#6B7FA3" />
+                          )}
+                        </View>
+                        <Text style={styles.tripTypeText}>{trip.bucket} Route</Text>
+                      </View>
+                      <View style={[styles.statusBadge, { backgroundColor: `${status.color}20` }]}>
+                        <Text style={[styles.statusText, { color: status.color }]}>{status.label}</Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.timeline}>
+                      <View style={styles.timelineLine} />
+                      {trip.absent ? (
+                        <View style={styles.timelineItem}>
+                          <View style={[styles.timelineDot, { backgroundColor: '#EF4444' }]}>
+                            <AlertTriangle size={13} color="#ffffff" />
+                          </View>
+                          <View style={styles.timelineContent}>
+                            <Text style={styles.timelineLabel}>Marked absent</Text>
+                            <Text style={styles.timelineTime}>{formatTime(trip.absent.createdAt)}</Text>
+                          </View>
+                        </View>
                       ) : (
-                        <Svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                          <Path d="M7 2a5 5 0 0 0 0 10A5 5 0 0 0 7 2zM3 7a4 4 0 0 1 7.5-2" stroke="#6B7FA3" strokeWidth="1.5" fill="none" />
-                        </Svg>
+                        <>
+                          {trip.pickup && (
+                            <View style={styles.timelineItem}>
+                              <View style={[styles.timelineDot, { backgroundColor: '#22C55E' }]}>
+                                <CheckCircle2 size={13} color="#ffffff" />
+                              </View>
+                              <View style={styles.timelineContent}>
+                                <Text style={styles.timelineLabel}>Picked up</Text>
+                                <Text style={styles.timelineTime}>{formatTime(trip.pickup.createdAt)}</Text>
+                              </View>
+                            </View>
+                          )}
+                          {trip.dropoff && (
+                            <View style={styles.timelineItem}>
+                              <View style={[styles.timelineDot, { backgroundColor: '#22C55E' }]}>
+                                <CheckCircle2 size={13} color="#ffffff" />
+                              </View>
+                              <View style={styles.timelineContent}>
+                                <Text style={styles.timelineLabel}>Dropped off</Text>
+                                <Text style={styles.timelineTime}>{formatTime(trip.dropoff.createdAt)}</Text>
+                              </View>
+                            </View>
+                          )}
+                        </>
                       )}
                     </View>
-                    <Text style={styles.tripTypeText}>{trip.type} Route</Text>
-                  </View>
-                  <View
-                    style={[
-                      styles.statusBadge,
-                      { backgroundColor: `${trip.statusColor}20` },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.statusText,
-                        { color: trip.statusColor },
-                      ]}
-                    >
-                      {trip.status}
-                    </Text>
-                  </View>
-                </View>
 
-                {/* Timeline */}
-                <View style={styles.timeline}>
-                  <View style={styles.timelineLine} />
-                  {trip.pickup && (
-                    <View style={styles.timelineItem}>
-                      <View style={[styles.timelineDot, { backgroundColor: '#22C55E' }]}>
-                        <CheckCircle2 size={13} color="#ffffff" />
+                    {trip.busRegistration && (
+                      <View style={styles.durationRow}>
+                        <Clock size={13} color="#6B7FA3" />
+                        <Text style={styles.durationText}>Bus {trip.busRegistration}</Text>
                       </View>
-                      <View style={styles.timelineContent}>
-                        <Text style={styles.timelineLabel}>Picked up</Text>
-                        <Text style={styles.timelineTime}>{trip.pickup}</Text>
-                      </View>
-                    </View>
-                  )}
-                  {trip.arrival && (
-                    <View style={styles.timelineItem}>
-                      <View style={[styles.timelineDot, { backgroundColor: '#1B365D' }]}>
-                        <MapPin size={12} color="#F5C542" />
-                      </View>
-                      <View style={styles.timelineContent}>
-                        <Text style={styles.timelineLabel}>School arrival</Text>
-                        <Text style={styles.timelineTime}>{trip.arrival}</Text>
-                      </View>
-                    </View>
-                  )}
-                  {trip.dropoff && (
-                    <View style={styles.timelineItem}>
-                      <View style={[styles.timelineDot, { backgroundColor: '#22C55E' }]}>
-                        <CheckCircle2 size={13} color="#ffffff" />
-                      </View>
-                      <View style={styles.timelineContent}>
-                        <Text style={styles.timelineLabel}>Dropped off home</Text>
-                        <Text style={styles.timelineTime}>{trip.dropoff}</Text>
-                      </View>
-                    </View>
-                  )}
-                </View>
-
-                {/* Duration */}
-                <View style={styles.durationRow}>
-                  <Clock size={13} color="#6B7FA3" />
-                  <Text style={styles.durationText}>
-                    Duration: {trip.type === 'Morning' ? '36 min' : '37 min'} · Bus KCA 345G
-                  </Text>
-                </View>
-              </View>
-            ))}
-          </View>
-        ))}
-        <View style={styles.bottomSpacer} />
-      </ScrollView>
+                    )}
+                  </View>
+                );
+              })}
+            </View>
+          ))}
+          <View style={styles.bottomSpacer} />
+        </ScrollView>
+      )}
     </SafeAreaView>
   );
 }
@@ -263,7 +280,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F7F9FC',
   },
-  // Header
   header: {
     backgroundColor: '#1B365D',
     paddingTop: 20,
@@ -309,12 +325,22 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.5)',
     fontSize: 10,
   },
-  // List
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
     padding: 20,
+  },
+  emptyText: {
+    color: '#6B7FA3',
+    fontSize: 14,
+    textAlign: 'center',
+    marginTop: 40,
   },
   daySection: {
     marginBottom: 20,
@@ -327,7 +353,6 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     marginBottom: 10,
   },
-  // Trip card
   tripCard: {
     borderRadius: 24,
     padding: 16,
@@ -368,7 +393,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
   },
-  // Timeline
   timeline: {
     position: 'relative',
     gap: 12,
@@ -410,7 +434,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
   },
-  // Duration
   durationRow: {
     flexDirection: 'row',
     alignItems: 'center',

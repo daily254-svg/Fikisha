@@ -29,4 +29,12 @@ export const ENDPOINTS = {
   schools: {
     byId: (schoolId: string) => `/schools/${schoolId}`,
   },
+  notifications: {
+    mine: '/notifications',
+    readAll: '/notifications/read-all',
+  },
+  incidents: {
+    create: '/incidents',
+    mine: '/incidents/mine',
+  },
 } as const

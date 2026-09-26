@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -7,39 +7,57 @@ import {
   ScrollView,
   Linking,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import {
-  ArrowLeft,
-  ChevronRight,
-  User2,
-  Phone,
-  Mail,
-  Shield,
-  Bell,
-  HelpCircle,
-  LogOut,
-  Bus,
-  Clock,
-  MapPin,
-} from 'lucide-react-native';
+import { ArrowLeft, User2, Phone, Mail, LogOut, Bus } from 'lucide-react-native';
+import { driversService } from '@/services/drivers.service';
+import { schoolsService, School } from '@/services/schools.service';
+import { useAuthStore } from '@/store/auth.store';
+import type { DriverProfile } from '@/types';
 
 interface ProfileScreenProps {
   onBack: () => void;
   onLogout: () => void;
 }
 
-const menuItems = [
-  { icon: Bell, label: 'Notification Settings', sub: 'Alerts & reminders' },
-  { icon: Shield, label: 'Privacy & Security', sub: 'PIN, biometrics' },
-  { icon: HelpCircle, label: 'Help & Support', sub: 'FAQs, contact us' },
-];
-
 export function DriverProfileScreen({ onBack, onLogout }: ProfileScreenProps) {
+  const { user } = useAuthStore();
+  const [isLoading, setIsLoading] = useState(true);
+  const [profile, setProfile] = useState<DriverProfile | null>(null);
+  const [school, setSchool] = useState<School | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const profileRes = await driversService.getProfile();
+        setProfile(profileRes.data);
+        if (user?.schoolId) {
+          const schoolRes = await schoolsService.getSchool(user.schoolId);
+          setSchool(schoolRes.data);
+        }
+      } catch (e) {
+        console.error('Failed to load driver profile', e);
+      } finally {
+        setIsLoading(false);
+      }
+    })();
+  }, []);
+
   const handleCall = (phone: string) => {
     const url = Platform.OS === 'android' ? `tel:${phone}` : `telprompt:${phone}`;
     Linking.openURL(url);
   };
+
+  const bus = profile?.busAssignments?.[0]?.bus;
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={[styles.container, styles.centered]}>
+        <ActivityIndicator color="#1B365D" size="large" />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -48,153 +66,88 @@ export function DriverProfileScreen({ onBack, onLogout }: ProfileScreenProps) {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity
-            onPress={onBack}
-            style={styles.backButton}
-            activeOpacity={0.8}
-          >
+          <TouchableOpacity onPress={onBack} style={styles.backButton} activeOpacity={0.8}>
             <ArrowLeft size={18} color="#ffffff" />
           </TouchableOpacity>
-
           <View style={styles.headerProfile}>
             <View style={styles.avatar}>
               <User2 size={40} color="#1B365D" />
             </View>
-            <Text style={styles.profileName}>James Mwangi</Text>
-            <Text style={styles.profileRole}>Driver · Nairobi Academy</Text>
+            <Text style={styles.profileName}>{profile?.user.name ?? 'Driver'}</Text>
+            <Text style={styles.profileRole}>
+              Driver{school ? ` · ${school.name}` : ''}
+            </Text>
 
-            {/* Assigned vehicle */}
-            <View style={styles.vehicleCard}>
-              <Bus size={18} color="#F5C542" />
-              <View>
-                <Text style={styles.vehiclePlate}>KCA 345G</Text>
-                <Text style={styles.vehicleDetail}>Capacity: 28 students</Text>
+            {bus && (
+              <View style={styles.vehicleCard}>
+                <Bus size={18} color="#F5C542" />
+                <View>
+                  <Text style={styles.vehiclePlate}>{bus.registrationNumber}</Text>
+                  {bus.capacity && (
+                    <Text style={styles.vehicleDetail}>Capacity: {bus.capacity} students</Text>
+                  )}
+                </View>
               </View>
-            </View>
-
-            <View style={styles.statsRow}>
-              {[
-                { label: 'Trips', value: '156', icon: MapPin },
-                { label: 'On Time', value: '94%', icon: Clock },
-                { label: 'Students', value: '28', icon: User2 },
-              ].map((s, i) => {
-                const Icon = s.icon;
-                return (
-                  <View key={i} style={styles.statItem}>
-                    <Icon size={16} color="#F5C542" />
-                    <Text style={styles.statValue}>{s.value}</Text>
-                    <Text style={styles.statLabel}>{s.label}</Text>
-                  </View>
-                );
-              })}
-            </View>
+            )}
           </View>
         </View>
 
         <View style={styles.body}>
-          {/* Contact info */}
           <View style={styles.sectionCard}>
             <Text style={styles.sectionTitle}>Contact Info</Text>
-            {[
-              { icon: Phone, label: '+254 722 987 654' },
-              { icon: Mail, label: 'james.mwangi@gmail.com' },
-            ].map((item, i) => (
-              <View
-                key={i}
-                style={[
-                  styles.contactRow,
-                  i === 0 && styles.contactRowBorder,
-                ]}
-              >
-                <View style={styles.contactIcon}>
-                  <item.icon size={16} color="#6B7FA3" />
+            <View style={[styles.contactRow, styles.contactRowBorder]}>
+              <View style={styles.contactIcon}>
+                <Phone size={16} color="#6B7FA3" />
+              </View>
+              <Text style={styles.contactLabel}>{profile?.user.phone ?? '—'}</Text>
+            </View>
+            <View style={styles.contactRow}>
+              <View style={styles.contactIcon}>
+                <Mail size={16} color="#6B7FA3" />
+              </View>
+              <Text style={styles.contactLabel}>{profile?.user.email ?? 'Not provided'}</Text>
+            </View>
+          </View>
+
+          {(profile?.licenseNo || profile?.employeeNo) && (
+            <View style={styles.sectionCard}>
+              <Text style={styles.sectionTitle}>Credentials</Text>
+              {profile?.licenseNo && (
+                <View style={[styles.credentialRow, profile?.employeeNo && styles.credentialRowBorder]}>
+                  <Text style={styles.credentialLabel}>License Number</Text>
+                  <Text style={styles.credentialValue}>{profile.licenseNo}</Text>
                 </View>
-                <Text style={styles.contactLabel}>{item.label}</Text>
-              </View>
-            ))}
-          </View>
+              )}
+              {profile?.employeeNo && (
+                <View style={styles.credentialRow}>
+                  <Text style={styles.credentialLabel}>Employee ID</Text>
+                  <Text style={styles.credentialValue}>{profile.employeeNo}</Text>
+                </View>
+              )}
+            </View>
+          )}
 
-          {/* License & Employment */}
-          <View style={styles.sectionCard}>
-            <Text style={styles.sectionTitle}>Credentials</Text>
-            {[
-              { label: 'License Number', value: 'DL-KE-2021-084572' },
-              { label: 'Employee ID', value: 'NA-DRV-042' },
-              { label: 'Years of Service', value: '3 years' },
-            ].map((c, i) => (
-              <View
-                key={i}
-                style={[
-                  styles.credentialRow,
-                  i < 2 && styles.credentialRowBorder,
-                ]}
-              >
-                <Text style={styles.credentialLabel}>{c.label}</Text>
-                <Text style={styles.credentialValue}>{c.value}</Text>
-              </View>
-            ))}
-          </View>
-
-          {/* Emergency contacts */}
-          <View style={styles.sectionCard}>
-            <Text style={styles.sectionTitle}>Emergency Contacts</Text>
-            {[
-              { name: 'Transport Office', phone: '+254 20 123 4567' },
-              { name: 'School Admin', phone: '+254 733 111 222' },
-            ].map((c, i) => (
-              <View
-                key={i}
-                style={[
-                  styles.emergencyRow,
-                  i === 0 && styles.emergencyRowBorder,
-                ]}
-              >
+          {school?.phone && (
+            <View style={styles.sectionCard}>
+              <Text style={styles.sectionTitle}>Need help?</Text>
+              <View style={styles.emergencyRow}>
                 <View style={styles.emergencyInfo}>
-                  <Text style={styles.emergencyName}>{c.name}</Text>
-                  <Text style={styles.emergencyPhone}>{c.phone}</Text>
+                  <Text style={styles.emergencyName}>School transport office</Text>
+                  <Text style={styles.emergencyPhone}>{school.phone}</Text>
                 </View>
                 <TouchableOpacity
-                  onPress={() => handleCall(c.phone)}
+                  onPress={() => handleCall(school.phone!)}
                   style={styles.callButton}
                   activeOpacity={0.8}
                 >
                   <Phone size={15} color="#1B365D" />
                 </TouchableOpacity>
               </View>
-            ))}
-          </View>
+            </View>
+          )}
 
-          {/* Settings */}
-          <View style={styles.sectionCard}>
-            {menuItems.map((item, i) => (
-              <TouchableOpacity
-                key={i}
-                style={[
-                  styles.menuItem,
-                  i < menuItems.length - 1 && styles.menuItemBorder,
-                ]}
-                activeOpacity={0.7}
-              >
-                <View style={styles.menuIcon}>
-                  <item.icon size={17} color="#6B7FA3" />
-                </View>
-                <View style={styles.menuInfo}>
-                  <Text style={styles.menuLabel}>{item.label}</Text>
-                  <Text style={styles.menuSub}>{item.sub}</Text>
-                </View>
-                <ChevronRight size={16} color="#CBD5E1" />
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {/* Logout */}
-          <TouchableOpacity
-            onPress={onLogout}
-            style={styles.logoutButton}
-            activeOpacity={0.8}
-          >
+          <TouchableOpacity onPress={onLogout} style={styles.logoutButton} activeOpacity={0.8}>
             <LogOut size={18} color="#EF4444" />
             <Text style={styles.logoutText}>Sign Out</Text>
           </TouchableOpacity>
@@ -209,16 +162,20 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F7F9FC',
   },
+  centered: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
     flexGrow: 1,
+    paddingBottom: 24,
   },
-  // Header
   header: {
     backgroundColor: '#1B365D',
-    paddingTop: 48,
+    paddingTop: 32,
     paddingBottom: 32,
     paddingHorizontal: 20,
   },
@@ -280,25 +237,6 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.6)',
     fontSize: 12,
   },
-  statsRow: {
-    flexDirection: 'row',
-    gap: 24,
-    marginTop: 20,
-  },
-  statItem: {
-    alignItems: 'center',
-    gap: 4,
-  },
-  statValue: {
-    color: '#F5C542',
-    fontSize: 19,
-    fontWeight: '800',
-  },
-  statLabel: {
-    color: 'rgba(255,255,255,0.55)',
-    fontSize: 11,
-  },
-  // Body
   body: {
     flex: 1,
     padding: 20,
@@ -319,7 +257,6 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     marginBottom: 12,
   },
-  // Contact
   contactRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -343,7 +280,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
   },
-  // Credentials
   credentialRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -363,16 +299,10 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
-  // Emergency
   emergencyRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 10,
-  },
-  emergencyRowBorder: {
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(27,54,93,0.06)',
   },
   emergencyInfo: {},
   emergencyName: {
@@ -390,38 +320,6 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     backgroundColor: '#F7F9FC',
   },
-  // Menu
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 16,
-  },
-  menuItemBorder: {
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(27,54,93,0.06)',
-  },
-  menuIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    backgroundColor: '#F7F9FC',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  menuInfo: {
-    flex: 1,
-  },
-  menuLabel: {
-    color: '#1B365D',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  menuSub: {
-    color: '#6B7FA3',
-    fontSize: 11,
-  },
-  // Logout
   logoutButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -432,7 +330,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#FEF2F2',
     borderWidth: 1.5,
     borderColor: 'rgba(239,68,68,0.15)',
-    marginBottom: 24,
   },
   logoutText: {
     color: '#EF4444',

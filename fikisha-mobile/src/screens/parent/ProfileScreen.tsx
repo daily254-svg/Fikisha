@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -8,44 +8,60 @@ import {
   Linking,
   Platform,
   StatusBar,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import {
-  ArrowLeft,
-  ChevronRight,
-  User2,
-  Phone,
-  Mail,
-  Shield,
-  Bell,
-  HelpCircle,
-  LogOut,
-  Plus,
-  Bus,
-} from 'lucide-react-native';
+import { ArrowLeft, User2, Phone, Mail, LogOut, Bus } from 'lucide-react-native';
+import { parentsService } from '@/services/parents.service';
+import { schoolsService, School } from '@/services/schools.service';
+import { useAuthStore } from '@/store/auth.store';
+import type { ParentProfile } from '@/types';
 
 interface ProfileScreenProps {
   onBack: () => void;
   onLogout: () => void;
 }
 
-const menuItems = [
-  { icon: Bell, label: 'Notification Settings', sub: 'Alerts & reminders' },
-  { icon: Shield, label: 'Privacy & Security', sub: 'PIN, biometrics' },
-  { icon: HelpCircle, label: 'Help & Support', sub: 'FAQs, contact us' },
-];
-
 export function ParentProfileScreen({ onBack, onLogout }: ProfileScreenProps) {
+  const { user } = useAuthStore();
+  const [isLoading, setIsLoading] = useState(true);
+  const [profile, setProfile] = useState<ParentProfile | null>(null);
+  const [school, setSchool] = useState<School | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const profileRes = await parentsService.getProfile();
+        setProfile(profileRes.data);
+        if (user?.schoolId) {
+          const schoolRes = await schoolsService.getSchool(user.schoolId);
+          setSchool(schoolRes.data);
+        }
+      } catch (e) {
+        console.error('Failed to load parent profile', e);
+      } finally {
+        setIsLoading(false);
+      }
+    })();
+  }, []);
+
   const handleCall = (phone: string) => {
     const url = Platform.OS === 'android' ? `tel:${phone}` : `telprompt:${phone}`;
     Linking.openURL(url);
   };
 
+  if (isLoading) {
+    return (
+      <SafeAreaView style={[styles.container, styles.centered]}>
+        <ActivityIndicator color="#1B365D" size="large" />
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar barStyle="light-content" backgroundColor="#1B365D" translucent />
 
-      {/* Header - fixed outside the ScrollView so body scrolls independently */}
       <View style={styles.header}>
         <TouchableOpacity onPress={onBack} style={styles.backButton} activeOpacity={0.8}>
           <ArrowLeft size={18} color="#ffffff" />
@@ -55,21 +71,10 @@ export function ParentProfileScreen({ onBack, onLogout }: ProfileScreenProps) {
           <View style={styles.avatar}>
             <User2 size={40} color="#1B365D" />
           </View>
-          <Text style={styles.profileName}>Benny Omondi</Text>
-          <Text style={styles.profileRole}>Parent · Nairobi Academy</Text>
-
-          <View style={styles.statsRow}>
-            {[
-              { label: 'Children', value: '1' },
-              { label: 'Trips', value: '48' },
-              { label: 'On Time', value: '91%' },
-            ].map((s, i) => (
-              <View key={i} style={styles.statItem}>
-                <Text style={styles.statValue}>{s.value}</Text>
-                <Text style={styles.statLabel}>{s.label}</Text>
-              </View>
-            ))}
-          </View>
+          <Text style={styles.profileName}>{profile?.user.name ?? 'Parent'}</Text>
+          <Text style={styles.profileRole}>
+            Parent{school ? ` · ${school.name}` : ''}
+          </Text>
         </View>
       </View>
 
@@ -79,112 +84,76 @@ export function ParentProfileScreen({ onBack, onLogout }: ProfileScreenProps) {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.body}>
-          {/* Contact info */}
           <View style={styles.sectionCard}>
             <Text style={styles.sectionTitle}>Contact Info</Text>
-            {[
-              { icon: Phone, label: '+254 722 123 456' },
-              { icon: Mail, label: 'benny.omondi@gmail.com' },
-            ].map((item, i) => (
-              <View
-                key={i}
-                style={[
-                  styles.contactRow,
-                  i === 0 && styles.contactRowBorder,
-                ]}
-              >
-                <View style={styles.contactIcon}>
-                  <item.icon size={16} color="#6B7FA3" />
+            <View style={[styles.contactRow, styles.contactRowBorder]}>
+              <View style={styles.contactIcon}>
+                <Phone size={16} color="#6B7FA3" />
+              </View>
+              <Text style={styles.contactLabel}>{profile?.user.phone ?? '—'}</Text>
+            </View>
+            <View style={styles.contactRow}>
+              <View style={styles.contactIcon}>
+                <Mail size={16} color="#6B7FA3" />
+              </View>
+              <Text style={styles.contactLabel}>{profile?.user.email ?? 'Not provided'}</Text>
+            </View>
+          </View>
+
+          <View style={styles.sectionCard}>
+            <Text style={styles.sectionTitle}>
+              {profile?.students.length === 1 ? 'Child' : 'Children'}
+            </Text>
+            {(!profile || profile.students.length === 0) && (
+              <Text style={styles.emptyText}>No children linked to your account yet.</Text>
+            )}
+            {profile?.students.map((link) => {
+              const bus = link.student.routes?.[0]?.route?.bus;
+              return (
+                <View key={link.student.id} style={styles.childCard}>
+                  <View style={styles.childAvatar}>
+                    <User2 size={22} color="#1B365D" />
+                  </View>
+                  <View style={styles.childInfo}>
+                    <Text style={styles.childName}>
+                      {link.student.firstName} {link.student.lastName}
+                    </Text>
+                    <Text style={styles.childDetail}>
+                      {link.student.grade ? `${link.student.grade} · ` : ''}
+                      Admission #{link.student.admissionNo}
+                    </Text>
+                  </View>
+                  {bus && (
+                    <View style={styles.childBus}>
+                      <Bus size={14} color="#F5C542" />
+                      <Text style={styles.childBusText}>{bus.registrationNumber}</Text>
+                    </View>
+                  )}
                 </View>
-                <Text style={styles.contactLabel}>{item.label}</Text>
-              </View>
-            ))}
+              );
+            })}
           </View>
 
-          {/* Children */}
-          <View style={styles.sectionCard}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Children</Text>
-              <TouchableOpacity style={styles.addButton} activeOpacity={0.8}>
-                <Plus size={13} color="#F5C542" />
-                <Text style={styles.addButtonText}>Add</Text>
-              </TouchableOpacity>
-            </View>
-            <View style={styles.childCard}>
-              <View style={styles.childAvatar}>
-                <User2 size={22} color="#1B365D" />
-              </View>
-              <View style={styles.childInfo}>
-                <Text style={styles.childName}>Amani Omondi</Text>
-                <Text style={styles.childDetail}>
-                  Grade 5 · Admission #NA2025-118
-                </Text>
-              </View>
-              <View style={styles.childBus}>
-                <Bus size={14} color="#F5C542" />
-                <Text style={styles.childBusText}>KCA 345G</Text>
-              </View>
-            </View>
-          </View>
-
-          {/* Emergency contacts */}
-          <View style={styles.sectionCard}>
-            <Text style={styles.sectionTitle}>Emergency Contacts</Text>
-            {[
-              { name: 'Jane Omondi (Spouse)', phone: '+254 733 456 789' },
-              { name: 'Transport Office', phone: '+254 20 123 4567' },
-            ].map((c, i) => (
-              <View
-                key={i}
-                style={[
-                  styles.emergencyRow,
-                  i === 0 && styles.emergencyRowBorder,
-                ]}
-              >
+          {school?.phone && (
+            <View style={styles.sectionCard}>
+              <Text style={styles.sectionTitle}>Need help?</Text>
+              <View style={styles.emergencyRow}>
                 <View style={styles.emergencyInfo}>
-                  <Text style={styles.emergencyName}>{c.name}</Text>
-                  <Text style={styles.emergencyPhone}>{c.phone}</Text>
+                  <Text style={styles.emergencyName}>School transport office</Text>
+                  <Text style={styles.emergencyPhone}>{school.phone}</Text>
                 </View>
                 <TouchableOpacity
-                  onPress={() => handleCall(c.phone)}
+                  onPress={() => handleCall(school.phone!)}
                   style={styles.callButton}
                   activeOpacity={0.8}
                 >
                   <Phone size={15} color="#1B365D" />
                 </TouchableOpacity>
               </View>
-            ))}
-          </View>
+            </View>
+          )}
 
-          {/* Settings */}
-          <View style={styles.sectionCard}>
-            {menuItems.map((item, i) => (
-              <TouchableOpacity
-                key={i}
-                style={[
-                  styles.menuItem,
-                  i < menuItems.length - 1 && styles.menuItemBorder,
-                ]}
-                activeOpacity={0.7}
-              >
-                <View style={styles.menuIcon}>
-                  <item.icon size={17} color="#6B7FA3" />
-                </View>
-                <View style={styles.menuInfo}>
-                  <Text style={styles.menuLabel}>{item.label}</Text>
-                  <Text style={styles.menuSub}>{item.sub}</Text>
-                </View>
-                <ChevronRight size={16} color="#CBD5E1" />
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {/* Logout */}
-          <TouchableOpacity
-            onPress={onLogout}
-            style={styles.logoutButton}
-            activeOpacity={0.8}
-          >
+          <TouchableOpacity onPress={onLogout} style={styles.logoutButton} activeOpacity={0.8}>
             <LogOut size={18} color="#EF4444" />
             <Text style={styles.logoutText}>Sign Out</Text>
           </TouchableOpacity>
@@ -199,13 +168,17 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F7F9FC',
   },
+  centered: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
     flexGrow: 1,
+    paddingBottom: 24,
   },
-  // Header
   header: {
     backgroundColor: '#1B365D',
     paddingTop: 20,
@@ -251,24 +224,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginTop: 2,
   },
-  statsRow: {
-    flexDirection: 'row',
-    gap: 24,
-    marginTop: 20,
-  },
-  statItem: {
-    alignItems: 'center',
-  },
-  statValue: {
-    color: '#F5C542',
-    fontSize: 19,
-    fontWeight: '800',
-  },
-  statLabel: {
-    color: 'rgba(255,255,255,0.55)',
-    fontSize: 11,
-  },
-  // Body
   body: {
     flex: 1,
     padding: 20,
@@ -281,12 +236,6 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: 'rgba(27,54,93,0.06)',
   },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
   sectionTitle: {
     color: '#6B7FA3',
     fontSize: 11,
@@ -295,7 +244,10 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     marginBottom: 12,
   },
-  // Contact
+  emptyText: {
+    color: '#6B7FA3',
+    fontSize: 13,
+  },
   contactRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -319,21 +271,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
   },
-  // Children
-  addButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    backgroundColor: '#FFF8E1',
-  },
-  addButtonText: {
-    color: '#1B365D',
-    fontSize: 11,
-    fontWeight: '600',
-  },
   childCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -341,6 +278,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 12,
     backgroundColor: '#F7F9FC',
+    marginBottom: 8,
   },
   childAvatar: {
     width: 44,
@@ -372,16 +310,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
-  // Emergency
   emergencyRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 10,
-  },
-  emergencyRowBorder: {
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(27,54,93,0.06)',
   },
   emergencyInfo: {},
   emergencyName: {
@@ -399,38 +331,6 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     backgroundColor: '#F7F9FC',
   },
-  // Menu
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 16,
-  },
-  menuItemBorder: {
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(27,54,93,0.06)',
-  },
-  menuIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    backgroundColor: '#F7F9FC',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  menuInfo: {
-    flex: 1,
-  },
-  menuLabel: {
-    color: '#1B365D',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  menuSub: {
-    color: '#6B7FA3',
-    fontSize: 11,
-  },
-  // Logout
   logoutButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -441,7 +341,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#FEF2F2',
     borderWidth: 1.5,
     borderColor: 'rgba(239,68,68,0.15)',
-    marginBottom: 24,
   },
   logoutText: {
     color: '#EF4444',

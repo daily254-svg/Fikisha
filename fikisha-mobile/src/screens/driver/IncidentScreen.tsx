@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   ScrollView,
   Linking,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -18,25 +19,58 @@ import {
   ShieldAlert,
   CheckCircle2,
 } from 'lucide-react-native';
+import { driversService } from '@/services/drivers.service';
+import { incidentsService } from '@/services/incidents.service';
+import { useLocation } from '@/hooks/useLocation';
+import type { ActiveBusAssignment, IncidentType } from '@/types';
 
 interface DriverIncidentScreenProps {
   onBack: () => void;
 }
 
-const incidentTypes = [
-  { id: 'delay', icon: Clock, label: 'Traffic Delay', color: '#F97316', bg: '#FFF7ED' },
-  { id: 'traffic', icon: AlertTriangle, label: 'Road Hazard', color: '#F5C542', bg: '#FFF8E1' },
-  { id: 'mechanical', icon: Wrench, label: 'Mechanical Issue', color: '#6B7FA3', bg: '#F7F9FC' },
-  { id: 'emergency', icon: ShieldAlert, label: 'Emergency', color: '#EF4444', bg: '#FEF2F2' },
+const incidentTypes: { id: IncidentType; icon: any; label: string; color: string; bg: string }[] = [
+  { id: 'DELAY', icon: Clock, label: 'Traffic Delay', color: '#F97316', bg: '#FFF7ED' },
+  { id: 'HAZARD', icon: AlertTriangle, label: 'Road Hazard', color: '#F5C542', bg: '#FFF8E1' },
+  { id: 'MECHANICAL', icon: Wrench, label: 'Mechanical Issue', color: '#6B7FA3', bg: '#F7F9FC' },
+  { id: 'EMERGENCY', icon: ShieldAlert, label: 'Emergency', color: '#EF4444', bg: '#FEF2F2' },
 ];
 
 export function DriverIncidentScreen({ onBack }: DriverIncidentScreenProps) {
-  const [selected, setSelected] = useState<string | null>(null);
+  const [selected, setSelected] = useState<IncidentType | null>(null);
   const [description, setDescription] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [activeBus, setActiveBus] = useState<ActiveBusAssignment | null>(null);
+  const location = useLocation(false);
 
-  const handleSubmit = () => {
-    if (selected) setSubmitted(true);
+  useEffect(() => {
+    driversService
+      .getActiveBus()
+      .then((res) => setActiveBus(res.data))
+      .catch((e) => console.error('Failed to load bus', e));
+  }, []);
+
+  const handleSubmit = async () => {
+    if (!selected || !description.trim()) return;
+
+    setIsSubmitting(true);
+    setError('');
+    try {
+      await incidentsService.create({
+        type: selected,
+        description: description.trim(),
+        latitude: location.latitude ?? undefined,
+        longitude: location.longitude ?? undefined,
+      });
+      setSubmitted(true);
+    } catch (err: any) {
+      setError(
+        err?.response?.data?.message ?? err?.message ?? 'Failed to submit report'
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleEmergencyCall = () => {
@@ -53,8 +87,7 @@ export function DriverIncidentScreen({ onBack }: DriverIncidentScreenProps) {
           </View>
           <Text style={styles.successTitle}>Report Submitted</Text>
           <Text style={styles.successMessage}>
-            The school transport office has been notified. Parents have been
-            alerted about the delay.
+            The school office and parents on this route have been notified.
           </Text>
           <TouchableOpacity
             onPress={() => {
@@ -81,27 +114,21 @@ export function DriverIncidentScreen({ onBack }: DriverIncidentScreenProps) {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
         <View style={styles.header}>
           <View style={styles.headerContent}>
-            <TouchableOpacity
-              onPress={onBack}
-              style={styles.backButton}
-              activeOpacity={0.8}
-            >
+            <TouchableOpacity onPress={onBack} style={styles.backButton} activeOpacity={0.8}>
               <ArrowLeft size={18} color="#ffffff" />
             </TouchableOpacity>
             <View>
               <Text style={styles.headerTitle}>Report Incident</Text>
               <Text style={styles.headerSubtitle}>
-                Bus KCA 345G · Morning Route A
+                {activeBus ? activeBus.bus.registrationNumber : 'No bus assigned'}
               </Text>
             </View>
           </View>
         </View>
 
         <View style={styles.body}>
-          {/* Incident type */}
           <Text style={styles.sectionTitle}>What type of incident?</Text>
           <View style={styles.incidentGrid}>
             {incidentTypes.map((type) => {
@@ -115,9 +142,7 @@ export function DriverIncidentScreen({ onBack }: DriverIncidentScreenProps) {
                     styles.incidentCard,
                     {
                       backgroundColor: isSelected ? type.color : '#ffffff',
-                      borderColor: isSelected
-                        ? type.color
-                        : 'rgba(27,54,93,0.08)',
+                      borderColor: isSelected ? type.color : 'rgba(27,54,93,0.08)',
                     },
                   ]}
                   activeOpacity={0.8}
@@ -125,23 +150,13 @@ export function DriverIncidentScreen({ onBack }: DriverIncidentScreenProps) {
                   <View
                     style={[
                       styles.incidentIcon,
-                      {
-                        backgroundColor: isSelected
-                          ? 'rgba(255,255,255,0.2)'
-                          : type.bg,
-                      },
+                      { backgroundColor: isSelected ? 'rgba(255,255,255,0.2)' : type.bg },
                     ]}
                   >
-                    <Icon
-                      size={24}
-                      color={isSelected ? '#ffffff' : type.color}
-                    />
+                    <Icon size={24} color={isSelected ? '#ffffff' : type.color} />
                   </View>
                   <Text
-                    style={[
-                      styles.incidentLabel,
-                      { color: isSelected ? '#ffffff' : '#1B365D' },
-                    ]}
+                    style={[styles.incidentLabel, { color: isSelected ? '#ffffff' : '#1B365D' }]}
                   >
                     {type.label}
                   </Text>
@@ -150,7 +165,6 @@ export function DriverIncidentScreen({ onBack }: DriverIncidentScreenProps) {
             })}
           </View>
 
-          {/* Description */}
           <Text style={styles.sectionTitle}>Additional details</Text>
           <TextInput
             value={description}
@@ -163,24 +177,23 @@ export function DriverIncidentScreen({ onBack }: DriverIncidentScreenProps) {
             textAlignVertical="top"
           />
 
-          {/* Current location note */}
           <View style={styles.infoBox}>
             <AlertTriangle size={16} color="#F97316" style={styles.infoIcon} />
             <Text style={styles.infoText}>
-              Your current GPS location will be automatically included with this
-              report. Parents and the school office will be notified immediately.
+              {location.latitude != null
+                ? 'Your current GPS location will be included with this report. Parents and the school office will be notified immediately.'
+                : 'Parents and the school office will be notified immediately.'}
             </Text>
           </View>
 
-          {/* Emergency call */}
-          {selected === 'emergency' && (
+          {selected === 'EMERGENCY' && (
             <View style={styles.emergencyBox}>
               <View style={styles.emergencyContent}>
                 <ShieldAlert size={22} color="#EF4444" />
                 <View style={styles.emergencyTextContainer}>
                   <Text style={styles.emergencyTitle}>Emergency detected</Text>
                   <Text style={styles.emergencySubtitle}>
-                    Emergency services will also be alerted
+                    If anyone is in danger, call emergency services directly
                   </Text>
                 </View>
               </View>
@@ -194,24 +207,29 @@ export function DriverIncidentScreen({ onBack }: DriverIncidentScreenProps) {
             </View>
           )}
 
-          {/* Submit */}
+          {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
           <TouchableOpacity
             onPress={handleSubmit}
-            disabled={!selected}
+            disabled={!selected || !description.trim() || isSubmitting}
             style={[
               styles.submitButton,
-              { backgroundColor: selected ? '#F5C542' : '#EFF2F7' },
+              { backgroundColor: selected && description.trim() ? '#F5C542' : '#EFF2F7' },
             ]}
             activeOpacity={0.8}
           >
-            <Text
-              style={[
-                styles.submitButtonText,
-                { color: selected ? '#1B365D' : '#CBD5E1' },
-              ]}
-            >
-              Submit Report
-            </Text>
+            {isSubmitting ? (
+              <ActivityIndicator color="#1B365D" size="small" />
+            ) : (
+              <Text
+                style={[
+                  styles.submitButtonText,
+                  { color: selected && description.trim() ? '#1B365D' : '#CBD5E1' },
+                ]}
+              >
+                Submit Report
+              </Text>
+            )}
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -230,7 +248,6 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
   },
-  // Header
   header: {
     backgroundColor: '#1B365D',
     paddingTop: 48,
@@ -259,7 +276,6 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.55)',
     fontSize: 12,
   },
-  // Body
   body: {
     flex: 1,
     padding: 20,
@@ -296,7 +312,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textAlign: 'center',
   },
-  // TextArea
   textArea: {
     backgroundColor: '#ffffff',
     borderRadius: 16,
@@ -310,7 +325,6 @@ const styles = StyleSheet.create({
     minHeight: 100,
     marginBottom: 16,
   },
-  // Info box
   infoBox: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -329,7 +343,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 18,
   },
-  // Emergency
   emergencyBox: {
     borderRadius: 16,
     padding: 16,
@@ -368,7 +381,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
-  // Submit
+  errorText: {
+    color: '#DC2626',
+    fontSize: 13,
+    marginBottom: 12,
+    textAlign: 'center',
+  },
   submitButton: {
     width: '100%',
     alignItems: 'center',
@@ -381,7 +399,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 16,
   },
-  // Success state
   successContainer: {
     flex: 1,
     alignItems: 'center',

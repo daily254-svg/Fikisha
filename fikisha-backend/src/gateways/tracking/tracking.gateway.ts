@@ -187,6 +187,24 @@ export class TrackingGateway
       .emit('student_dropped_off', result);
   }
 
+  @SubscribeMessage('student_absent')
+  @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
+  async handleStudentAbsent(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() payload: StudentEventDto,
+  ): Promise<void> {
+    if (!client.user) return;
+
+    const result = await this.trackingService.handleStudentAbsent(
+      client.user.schoolId,
+      payload,
+    );
+
+    this.server
+      .to(`parents:${client.user.schoolId}`)
+      .emit('student_marked_absent', result);
+  }
+
   private verifyToken(token: string): any | null {
     try {
       return this.jwtService.verify(token);

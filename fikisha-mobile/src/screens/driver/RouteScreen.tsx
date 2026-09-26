@@ -1,124 +1,173 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Svg, { Rect, Circle, Path } from 'react-native-svg';
 import {
   ArrowLeft,
   CheckCircle2,
   Circle as CircleIcon,
   Navigation,
   MapPin,
-  Bus,
+  Play,
   Square,
 } from 'lucide-react-native';
+import { driversService } from '@/services/drivers.service';
+import { trackingService } from '@/services/tracking.service';
+import { emitRouteStart, emitRouteEnd, emitGpsUpdate } from '@/lib/socket';
+import { useLocation } from '@/hooks/useLocation';
+import { RouteMap } from '@/components/RouteMap';
+import type { ActiveBusAssignment, RouteStudents, TransportEvent } from '@/types';
 
 interface DriverRouteScreenProps {
   onBack: () => void;
   onNavigate: (screen: string) => void;
 }
 
-interface Stop {
-  name: string;
-  students: number;
-  time: string;
-  status: 'done' | 'active' | 'pending' | 'school';
-}
-
-const stops: Stop[] = [
-  { name: 'Westlands Stop A', students: 4, time: '6:50 AM', status: 'done' },
-  { name: 'Parklands Rd Stop', students: 3, time: '7:00 AM', status: 'done' },
-  { name: 'Karen Estate Stop A', students: 5, time: '7:12 AM', status: 'done' },
-  { name: 'Karen Estate Stop B', students: 3, time: '7:18 AM', status: 'active' },
-  { name: "Lang'ata Road Stop", students: 4, time: '7:28 AM', status: 'pending' },
-  { name: 'South C Stop', students: 2, time: '7:36 AM', status: 'pending' },
-  { name: 'Nairobi Academy Gate', students: 0, time: '7:48 AM', status: 'school' },
-];
-
 export function DriverRouteScreen({ onBack, onNavigate }: DriverRouteScreenProps) {
+  const [isLoading, setIsLoading] = useState(true);
+  const [activeBus, setActiveBus] = useState<ActiveBusAssignment | null>(null);
+  const [routeStudents, setRouteStudents] = useState<RouteStudents[]>([]);
+  const [pickedUpIds, setPickedUpIds] = useState<Set<string>>(new Set());
+  const [routeActive, setRouteActive] = useState(false);
+
+  const location = useLocation(routeActive);
+
+  const load = async () => {
+    try {
+      const [busRes, studentsRes] = await Promise.all([
+        driversService.getActiveBus(),
+        driversService.getRouteStudents(),
+      ]);
+      setActiveBus(busRes.data);
+      setRouteStudents(studentsRes.data);
+
+      if (busRes.data) {
+        const today = new Date().toISOString().slice(0, 10);
+        const eventsRes = await trackingService.getTransportEvents({
+          busId: busRes.data.bus.id,
+          type: 'PICKED_UP',
+          date: today,
+        });
+        setPickedUpIds(new Set(eventsRes.data.map((e: TransportEvent) => e.studentId)));
+      }
+    } catch (e) {
+      console.error('Failed to load route', e);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  // Push GPS updates to parents while the route is active.
+  useEffect(() => {
+    if (!routeActive || !activeBus) return;
+    if (location.latitude == null || location.longitude == null) return;
+
+    emitGpsUpdate({
+      busId: activeBus.bus.id,
+      lat: location.latitude,
+      lng: location.longitude,
+      speed: location.speed ?? 0,
+      heading: location.heading ?? 0,
+      updatedAt: new Date().toISOString(),
+    });
+  }, [routeActive, activeBus, location.latitude, location.longitude]);
+
+  const route = routeStudents[0]?.route ?? activeBus?.bus.routes?.[0];
+  const students = routeStudents[0]?.students ?? [];
+  const stops = route?.stops ?? [];
+
+  const stopStatus = useMemo(() => {
+    const sorted = [...stops].sort((a, b) => a.sequence - b.sequence);
+    let foundActive = false;
+    return sorted.map((stop) => {
+      const stopStudents = students.filter((s) => s.pickupStopId === stop.id);
+      const done = stopStudents.length > 0 && stopStudents.every((s) => pickedUpIds.has(s.id));
+      let status: 'done' | 'active' | 'pending' = done ? 'done' : 'pending';
+      if (!done && !foundActive) {
+        status = 'active';
+        foundActive = true;
+      }
+      return { stop, students: stopStudents, status };
+    });
+  }, [stops, students, pickedUpIds]);
+
+  const doneCount = stopStatus.filter((s) => s.status === 'done').length;
+  const totalStops = stopStatus.length;
+  const progressPercent = totalStops > 0 ? Math.round((doneCount / totalStops) * 100) : 0;
+
+  const handleToggleRoute = async () => {
+    if (!activeBus || !route) return;
+    if (routeActive) {
+      await emitRouteEnd(activeBus.bus.id);
+      setRouteActive(false);
+      onBack();
+    } else {
+      await emitRouteStart(activeBus.bus.id, route.id);
+      setRouteActive(true);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={[styles.container, styles.centered]}>
+        <ActivityIndicator color="#1B365D" size="large" />
+      </SafeAreaView>
+    );
+  }
+
+  if (!activeBus || !route) {
+    return (
+      <SafeAreaView style={[styles.container, styles.centered]} edges={['top']}>
+        <TouchableOpacity onPress={onBack} style={styles.emptyBackButton} activeOpacity={0.8}>
+          <ArrowLeft size={18} color="#1B365D" />
+        </TouchableOpacity>
+        <Text style={styles.emptyText}>
+          You don&apos;t have an assigned bus or route yet.
+        </Text>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Map area */}
       <View style={styles.mapContainer}>
-        <Svg
-          width="100%"
-          height="100%"
-          viewBox="0 0 390 208"
-          preserveAspectRatio="xMidYMid slice"
-          style={StyleSheet.absoluteFill}
-        >
-          <Rect width="390" height="208" fill="#E8F4FD" />
-          {/* Grid lines */}
-          {[40, 100, 160].map((y, i) => (
-            <Rect key={`h${i}`} x="0" y={y} width="390" height="1" fill="rgba(255,255,255,0.7)" />
-          ))}
-          {[60, 130, 200, 270, 340].map((x, i) => (
-            <Rect key={`v${i}`} x={x} y="0" width="1" height="208" fill="rgba(255,255,255,0.7)" />
-          ))}
-          {/* Blocks */}
-          <Rect x="62" y="42" width="67" height="57" rx="4" fill="rgba(200,220,240,0.5)" />
-          <Rect x="132" y="42" width="67" height="57" rx="4" fill="rgba(200,220,240,0.5)" />
-          <Rect x="202" y="42" width="67" height="57" rx="4" fill="rgba(200,220,240,0.5)" />
-          <Rect x="62" y="102" width="67" height="57" rx="4" fill="rgba(200,220,240,0.4)" />
-          <Rect x="202" y="102" width="67" height="57" rx="4" fill="rgba(200,220,240,0.4)" />
-          <Rect x="272" y="42" width="67" height="117" rx="4" fill="rgba(200,220,240,0.45)" />
-          {/* Route line - pending */}
-          <Path
-            d="M30 180 L130 180 L130 100 L200 100 L200 40 L360 40"
-            stroke="#F5C542"
-            strokeWidth="4"
-            fill="none"
-            strokeDasharray="10 5"
-            strokeLinecap="round"
-          />
-          {/* Route line - completed */}
-          <Path
-            d="M30 180 L130 180 L130 100"
-            stroke="#22C55E"
-            strokeWidth="4"
-            fill="none"
-            strokeLinecap="round"
-          />
-          {/* Done stops */}
-          <Circle cx="30" cy="180" r="7" fill="#22C55E" />
-          <Circle cx="130" cy="180" r="7" fill="#22C55E" />
-          <Circle cx="130" cy="100" r="7" fill="#22C55E" />
-          {/* Active */}
-          <Circle cx="200" cy="100" r="9" fill="#F5C542" />
-          <Circle cx="200" cy="100" r="4" fill="#1B365D" />
-          {/* Pending */}
-          <Circle cx="200" cy="40" r="6" fill="#CBD5E1" />
-          <Circle cx="280" cy="40" r="6" fill="#CBD5E1" />
-          {/* School */}
-          <Circle cx="360" cy="40" r="10" fill="#1B365D" />
-          <Path
-            d="M360 32L353 37v10h4v-5h6v5h4V37L360 32z"
-            fill="#F5C542"
-          />
-        </Svg>
-
-        {/* Bus marker */}
-        <View style={styles.busMarker}>
-          <Bus size={18} color="#F5C542" />
-        </View>
+        <RouteMap
+          stops={stops.map((s) => ({
+            id: s.id,
+            name: s.name,
+            latitude: s.latitude,
+            longitude: s.longitude,
+            sequence: s.sequence,
+          }))}
+          busLocation={
+            location.latitude != null && location.longitude != null
+              ? { lat: location.latitude, lng: location.longitude }
+              : null
+          }
+          height={208}
+        />
 
         {/* Top bar */}
         <View style={styles.topBar}>
-          <TouchableOpacity
-            onPress={onBack}
-            style={styles.topBarButton}
-            activeOpacity={0.8}
-          >
+          <TouchableOpacity onPress={onBack} style={styles.topBarButton} activeOpacity={0.8}>
             <ArrowLeft size={20} color="#1B365D" />
           </TouchableOpacity>
           <View style={styles.routeActiveBadge}>
-            <Navigation size={14} color="#22C55E" />
-            <Text style={styles.routeActiveText}>Route Active</Text>
+            <Navigation size={14} color={routeActive ? '#22C55E' : '#6B7FA3'} />
+            <Text style={styles.routeActiveText}>
+              {routeActive ? 'Route Active' : 'Not Started'}
+            </Text>
           </View>
           <TouchableOpacity
             onPress={() => onNavigate('driver-pickup')}
@@ -133,11 +182,13 @@ export function DriverRouteScreen({ onBack, onNavigate }: DriverRouteScreenProps
       {/* Progress bar */}
       <View style={styles.progressContainer}>
         <View style={styles.progressLabels}>
-          <Text style={styles.progressLabel}>Stop 4 of 7</Text>
-          <Text style={styles.progressPercent}>43% complete</Text>
+          <Text style={styles.progressLabel}>
+            {totalStops > 0 ? `${doneCount} of ${totalStops} stops` : 'No stops on this route'}
+          </Text>
+          <Text style={styles.progressPercent}>{progressPercent}% complete</Text>
         </View>
         <View style={styles.progressBarBg}>
-          <View style={[styles.progressBarFill, { width: '43%' }]} />
+          <View style={[styles.progressBarFill, { width: `${progressPercent}%` }]} />
         </View>
       </View>
 
@@ -148,44 +199,34 @@ export function DriverRouteScreen({ onBack, onNavigate }: DriverRouteScreenProps
         showsVerticalScrollIndicator={false}
       >
         <Text style={styles.stopListTitle}>Route Stops</Text>
-        {stops.map((stop, i) => (
+        {stopStatus.map(({ stop, students: stopStudents, status }) => (
           <View
-            key={i}
+            key={stop.id}
             style={[
               styles.stopCard,
               {
-                backgroundColor: stop.status === 'active' ? '#FFF8E1' : '#ffffff',
-                borderColor:
-                  stop.status === 'active'
-                    ? 'rgba(245,197,66,0.4)'
-                    : 'rgba(27,54,93,0.06)',
+                backgroundColor: status === 'active' ? '#FFF8E1' : '#ffffff',
+                borderColor: status === 'active' ? 'rgba(245,197,66,0.4)' : 'rgba(27,54,93,0.06)',
               },
             ]}
           >
-            {/* Status icon */}
             <View
               style={[
                 styles.stopIcon,
                 {
                   backgroundColor:
-                    stop.status === 'done'
+                    status === 'done'
                       ? 'rgba(34,197,94,0.12)'
-                      : stop.status === 'active'
+                      : status === 'active'
                         ? '#F5C542'
-                        : stop.status === 'school'
-                          ? '#1B365D'
-                          : '#EFF2F7',
+                        : '#EFF2F7',
                 },
               ]}
             >
-              {stop.status === 'done' ? (
+              {status === 'done' ? (
                 <CheckCircle2 size={18} color="#22C55E" />
-              ) : stop.status === 'active' ? (
+              ) : status === 'active' ? (
                 <Navigation size={18} color="#1B365D" />
-              ) : stop.status === 'school' ? (
-                <Svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                  <Path d="M8 1L1 5v10h4V9h6v6h4V5L8 1z" fill="#F5C542" />
-                </Svg>
               ) : (
                 <CircleIcon size={16} color="#CBD5E1" />
               )}
@@ -196,53 +237,41 @@ export function DriverRouteScreen({ onBack, onNavigate }: DriverRouteScreenProps
                 style={[
                   styles.stopName,
                   {
-                    color:
-                      stop.status === 'pending' || stop.status === 'school'
-                        ? '#6B7FA3'
-                        : '#1B365D',
-                    fontWeight: stop.status === 'active' ? '700' : '500',
+                    color: status === 'pending' ? '#6B7FA3' : '#1B365D',
+                    fontWeight: status === 'active' ? '700' : '500',
                   },
                 ]}
               >
-                {stop.name}
+                {stop.sequence}. {stop.name}
               </Text>
-              {stop.students > 0 && (
+              {stopStudents.length > 0 && (
                 <Text style={styles.stopStudents}>
-                  {stop.students} student{stop.students !== 1 ? 's' : ''}
+                  {stopStudents.length} student{stopStudents.length !== 1 ? 's' : ''}
                 </Text>
               )}
             </View>
 
-            <View style={styles.stopTimeContainer}>
-              <Text
-                style={[
-                  styles.stopTime,
-                  {
-                    color: stop.status === 'active' ? '#1B365D' : '#6B7FA3',
-                    fontWeight: stop.status === 'active' ? '700' : '400',
-                  },
-                ]}
-              >
-                {stop.time}
-              </Text>
-              {stop.status === 'done' && (
-                <Text style={styles.stopDoneText}>Done</Text>
-              )}
-              {stop.status === 'active' && (
-                <Text style={styles.stopNextText}>Next</Text>
-              )}
-            </View>
+            {status === 'done' && <Text style={styles.stopDoneText}>Done</Text>}
+            {status === 'active' && <Text style={styles.stopNextText}>Next</Text>}
           </View>
         ))}
 
-        {/* End route button */}
         <TouchableOpacity
-          onPress={onBack}
-          style={styles.endRouteButton}
+          onPress={handleToggleRoute}
+          style={routeActive ? styles.endRouteButton : styles.startRouteButton}
           activeOpacity={0.8}
         >
-          <Square size={18} color="#EF4444" fill="#EF4444" />
-          <Text style={styles.endRouteText}>End Route</Text>
+          {routeActive ? (
+            <>
+              <Square size={18} color="#EF4444" fill="#EF4444" />
+              <Text style={styles.endRouteText}>End Route</Text>
+            </>
+          ) : (
+            <>
+              <Play size={18} color="#1B365D" fill="#1B365D" />
+              <Text style={styles.startRouteText}>Start Route</Text>
+            </>
+          )}
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
@@ -254,33 +283,35 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F7F9FC',
   },
+  centered: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 16,
+    paddingHorizontal: 32,
+  },
+  emptyBackButton: {
+    position: 'absolute',
+    top: 16,
+    left: 20,
+    width: 40,
+    height: 40,
+    borderRadius: 16,
+    backgroundColor: '#EFF2F7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyText: {
+    color: '#6B7FA3',
+    fontSize: 14,
+    textAlign: 'center',
+  },
   // Map
   mapContainer: {
     height: 208,
-    backgroundColor: '#DBEAFE',
-    overflow: 'hidden',
-  },
-  busMarker: {
-    position: 'absolute',
-    top: 78,
-    left: 183,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#1B365D',
-    borderWidth: 3,
-    borderColor: '#F5C542',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
   },
   topBar: {
     position: 'absolute',
-    top: 48,
+    top: 12,
     left: 0,
     right: 0,
     flexDirection: 'row',
@@ -361,6 +392,7 @@ const styles = StyleSheet.create({
   stopListContent: {
     padding: 20,
     gap: 8,
+    paddingBottom: 24,
   },
   stopListTitle: {
     color: '#1B365D',
@@ -394,12 +426,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     marginTop: 2,
   },
-  stopTimeContainer: {
-    alignItems: 'flex-end',
-  },
-  stopTime: {
-    fontSize: 12,
-  },
   stopDoneText: {
     color: '#22C55E',
     fontSize: 10,
@@ -410,14 +436,28 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '600',
   },
-  // End route
+  // Route toggle
+  startRouteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 20,
+    paddingVertical: 16,
+    borderRadius: 16,
+    backgroundColor: '#F5C542',
+  },
+  startRouteText: {
+    color: '#1B365D',
+    fontWeight: '700',
+    fontSize: 15,
+  },
   endRouteButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
     marginTop: 20,
-    marginBottom: 24,
     paddingVertical: 16,
     borderRadius: 16,
     backgroundColor: '#FEF2F2',

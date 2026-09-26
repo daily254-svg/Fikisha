@@ -575,7 +575,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFF7ED',
     borderWidth: 1.5,
     borderColor: 'rgba(249,115,22,0.2)',
-    marginBottom: 32,
+    marginBottom: 24,
   },
   incidentIcon: {
     width: 40,

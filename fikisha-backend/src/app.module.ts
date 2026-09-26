@@ -17,6 +17,7 @@ import { RoutesModule } from './modules/routes/routes.module';
 import { TrackingModule } from './modules/tracking/tracking.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { TransportEventsModule } from './modules/transport-events/transport-events.module';
+import { IncidentsModule } from './modules/incidents/incidents.module';
 
 import { PrismaModule } from './prisma/prisma.module';
 import { RedisModule } from './redis/redis.module';
@@ -57,6 +58,7 @@ import { validate } from './config/env.validation';
     TrackingModule,
     NotificationsModule,
     TransportEventsModule,
+    IncidentsModule,
     PrismaModule,
     RedisModule,
   ],

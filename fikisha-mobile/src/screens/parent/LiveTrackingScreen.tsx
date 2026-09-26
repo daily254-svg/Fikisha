@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -6,180 +6,138 @@ import {
   StyleSheet,
   Animated,
   Linking,
-  Platform,
-  Dimensions,
+  ActivityIndicator,
   StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Svg, { Rect, Circle, Path } from 'react-native-svg';
 import {
   ArrowLeft,
   Phone,
   Bus,
-  MapPin,
-  Clock,
   Gauge,
   RefreshCw,
   ChevronUp,
   ChevronDown,
 } from 'lucide-react-native';
-
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+import { parentsService } from '@/services/parents.service';
+import { schoolsService, School } from '@/services/schools.service';
+import { useTracking } from '@/hooks/useTracking';
+import { useAuthStore } from '@/store/auth.store';
+import { RouteMap } from '@/components/RouteMap';
+import type { Student } from '@/types';
 
 interface LiveTrackingScreenProps {
   onBack: () => void;
 }
 
+function timeAgo(iso: string): string {
+  const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  return `${Math.round(mins / 60)}h ago`;
+}
+
 export function LiveTrackingScreen({ onBack }: LiveTrackingScreenProps) {
+  const { user } = useAuthStore();
   const [sheetExpanded, setSheetExpanded] = useState(false);
   const sheetHeight = useRef(new Animated.Value(220)).current;
 
+  const [isLoading, setIsLoading] = useState(true);
+  const [student, setStudent] = useState<Student | null>(null);
+  const [busId, setBusId] = useState<string | null>(null);
+  const [busRegistration, setBusRegistration] = useState<string | null>(null);
+  const [school, setSchool] = useState<School | null>(null);
+
+  const { liveLocation, dbLocation, isLive } = useTracking(busId);
+
+  const load = async () => {
+    try {
+      const [studentsRes] = await Promise.all([parentsService.getStudents()]);
+      const first = studentsRes.data[0]?.student ?? null;
+      setStudent(first);
+
+      if (first) {
+        const routeBus = first.routes?.[0]?.route?.bus;
+        if (routeBus) {
+          setBusId(routeBus.id);
+          setBusRegistration(routeBus.registrationNumber);
+        } else {
+          const busRes = await parentsService.getStudentBus(first.id);
+          setBusId(busRes.data.bus?.id ?? null);
+          setBusRegistration(busRes.data.bus?.registrationNumber ?? null);
+        }
+      }
+
+      if (user?.schoolId) {
+        const schoolRes = await schoolsService.getSchool(user.schoolId);
+        setSchool(schoolRes.data);
+      }
+    } catch (e) {
+      console.error('Failed to load live tracking', e);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load();
+  }, []);
+
   const toggleSheet = () => {
-    const toValue = sheetExpanded ? 220 : 360;
-    Animated.spring(sheetHeight, {
-      toValue,
-      useNativeDriver: false,
-      friction: 8,
-    }).start();
+    const toValue = sheetExpanded ? 220 : 380;
+    Animated.spring(sheetHeight, { toValue, useNativeDriver: false, friction: 8 }).start();
     setSheetExpanded(!sheetExpanded);
   };
 
   const handleCallSchool = () => {
-    Linking.openURL(
-      Platform.OS === 'android' ? 'tel:+254700000000' : 'telprompt:+254700000000',
-    );
+    if (school?.phone) Linking.openURL(`tel:${school.phone}`);
   };
+
+  const stops = student?.routes?.[0]?.route?.stops ?? [];
+  const location = liveLocation ?? dbLocation;
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={[styles.container, styles.centered]}>
+        <ActivityIndicator color="#1B365D" size="large" />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar barStyle="dark-content" backgroundColor="#E8F4FD" translucent />
       <View style={styles.container}>
-        {/* Map background */}
         <View style={styles.mapContainer}>
-          <Svg
-            width="100%"
-            height="100%"
-            viewBox="0 0 390 700"
-            preserveAspectRatio="xMidYMid slice"
-            style={StyleSheet.absoluteFill}
-          >
-            {/* Background */}
-            <Rect width="390" height="700" fill="#E8F4FD" />
-
-            {/* Grid streets */}
-            {[50, 120, 200, 280, 360, 440, 520, 600].map((y, i) => (
-              <Rect key={`h${i}`} x="0" y={y} width="390" height="1.5" fill="rgba(255,255,255,0.8)" />
-            ))}
-            {[50, 110, 175, 240, 310, 370].map((x, i) => (
-              <Rect key={`v${i}`} x={x} y="0" width="1.5" height="700" fill="rgba(255,255,255,0.8)" />
-            ))}
-
-            {/* Block fills */}
-            <Rect x="52" y="122" width="57" height="77" rx="4" fill="rgba(200,220,240,0.5)" />
-            <Rect x="112" y="52" width="62" height="67" rx="4" fill="rgba(200,220,240,0.5)" />
-            <Rect x="177" y="122" width="62" height="77" rx="4" fill="rgba(200,220,240,0.5)" />
-            <Rect x="242" y="52" width="67" height="67" rx="4" fill="rgba(200,220,240,0.5)" />
-            <Rect x="52" y="202" width="57" height="77" rx="4" fill="rgba(200,220,240,0.5)" />
-            <Rect x="177" y="202" width="62" height="77" rx="4" fill="rgba(200,220,240,0.5)" />
-            <Rect x="242" y="202" width="67" height="77" rx="4" fill="rgba(200,220,240,0.4)" />
-            <Rect x="312" y="122" width="77" height="77" rx="4" fill="rgba(180,210,235,0.5)" />
-            <Rect x="52" y="282" width="57" height="77" rx="4" fill="rgba(200,220,240,0.5)" />
-            <Rect x="112" y="282" width="62" height="77" rx="4" fill="rgba(200,220,240,0.4)" />
-            <Rect x="242" y="282" width="67" height="77" rx="4" fill="rgba(200,220,240,0.5)" />
-            <Rect x="312" y="202" width="77" height="77" rx="4" fill="rgba(200,220,240,0.5)" />
-
-            {/* Route path */}
-            <Path
-              d="M60 500 L60 360 L175 360 L175 280 L240 280 L240 200 L310 200 L310 130 L370 130"
-              stroke="#F5C542"
-              strokeWidth="5"
-              fill="none"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeDasharray="12 6"
-            />
-            <Path
-              d="M60 500 L60 360 L175 360 L175 280"
-              stroke="#22C55E"
-              strokeWidth="5"
-              fill="none"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-
-            {/* Stop markers */}
-            <Circle cx="60" cy="500" r="10" fill="#22C55E" />
-            <Circle cx="60" cy="500" r="5" fill="#ffffff" />
-            {/* Text isn't easily centered in RN SVG, skip label or use Text component */}
-
-            <Circle cx="175" cy="280" r="10" fill="#F5C542" />
-            <Circle cx="175" cy="280" r="5" fill="#1B365D" />
-
-            <Circle cx="240" cy="200" r="8" fill="#CBD5E1" />
-            <Circle cx="240" cy="200" r="4" fill="#ffffff" />
-
-            <Circle cx="310" cy="130" r="8" fill="#CBD5E1" />
-            <Circle cx="310" cy="130" r="4" fill="#ffffff" />
-
-            {/* School marker */}
-            <Circle cx="370" cy="130" r="14" fill="#1B365D" />
-            <Path d="M370 120L360 126v18h6v-7h8v7h6V126L370 120z" fill="#F5C542" />
-          </Svg>
-
-          {/* Bus marker */}
-          <View style={styles.busMarker}>
-            <Bus size={20} color="#F5C542" />
-          </View>
-
-          {/* Bus pulse */}
-          <View style={styles.busPulse} />
+          <RouteMap
+            stops={stops.map((s) => ({
+              id: s.id,
+              name: s.name,
+              latitude: s.latitude,
+              longitude: s.longitude,
+              sequence: s.sequence,
+            }))}
+            busLocation={location ? { lat: location.lat, lng: location.lng } : null}
+          />
         </View>
 
-        {/* Top overlay */}
         <View style={styles.topOverlay}>
           <View style={styles.topBar}>
-            <TouchableOpacity
-              onPress={onBack}
-              style={styles.topBarButton}
-              activeOpacity={0.8}
-            >
+            <TouchableOpacity onPress={onBack} style={styles.topBarButton} activeOpacity={0.8}>
               <ArrowLeft size={20} color="#1B365D" />
             </TouchableOpacity>
             <View style={styles.liveBadge}>
-              <View style={styles.liveDot} />
-              <Text style={styles.liveBadgeText}>LIVE TRACKING</Text>
+              <View style={[styles.liveDot, { backgroundColor: isLive ? '#22C55E' : '#CBD5E1' }]} />
+              <Text style={styles.liveBadgeText}>{isLive ? 'LIVE TRACKING' : 'LAST KNOWN LOCATION'}</Text>
             </View>
-            <TouchableOpacity style={styles.topBarButton} activeOpacity={0.8}>
+            <TouchableOpacity onPress={load} style={styles.topBarButton} activeOpacity={0.8}>
               <RefreshCw size={18} color="#1B365D" />
             </TouchableOpacity>
           </View>
-
-          {/* ETA card */}
-          <View style={styles.etaCard}>
-            <View style={styles.etaCardContainer}>
-              <View style={styles.etaIcon}>
-                <Clock size={22} color="#F5C542" />
-              </View>
-              <View style={styles.etaInfo}>
-                <Text style={styles.etaLabel}>Estimated arrival at school</Text>
-                <Text style={styles.etaTime}>7:45 AM</Text>
-              </View>
-              <View style={styles.etaCountdown}>
-                <Text style={styles.etaCountdownLabel}>In</Text>
-                <Text style={styles.etaCountdownValue}>33 min</Text>
-              </View>
-            </View>
-          </View>
         </View>
 
-        {/* Bottom sheet */}
         <Animated.View style={[styles.bottomSheet, { height: sheetHeight }]}>
-          {/* Sheet handle */}
-          <TouchableOpacity
-            onPress={toggleSheet}
-            style={styles.sheetHandle}
-            activeOpacity={0.8}
-          >
+          <TouchableOpacity onPress={toggleSheet} style={styles.sheetHandle} activeOpacity={0.8}>
             <View style={styles.sheetHandleBar} />
             {sheetExpanded ? (
               <ChevronDown size={16} color="#6B7FA3" />
@@ -189,24 +147,37 @@ export function LiveTrackingScreen({ onBack }: LiveTrackingScreenProps) {
           </TouchableOpacity>
 
           <View style={styles.sheetContent}>
-            {/* Bus info */}
             <View style={styles.busInfoRow}>
               <View>
-                <Text style={styles.busPlate}>Bus KCA 345G</Text>
-                <Text style={styles.busDriver}>Driver: James Mwangi</Text>
-              </View>
-              <View style={styles.stopsBadge}>
-                <MapPin size={14} color="#F5C542" />
-                <Text style={styles.stopsBadgeText}>4 stops away</Text>
+                <Text style={styles.busPlate}>{busRegistration ?? 'No bus assigned'}</Text>
+                {student && (
+                  <Text style={styles.busDriver}>
+                    {student.firstName} {student.lastName}
+                  </Text>
+                )}
               </View>
             </View>
 
-            {/* Stats row */}
             <View style={styles.statsRow}>
               {[
-                { label: 'Speed', value: '28 km/h', Icon: Gauge, color: '#1B365D' },
-                { label: 'Students', value: '18 / 22', Icon: Bus, color: '#1B365D' },
-                { label: 'Updated', value: 'Just now', Icon: RefreshCw, color: '#22C55E' },
+                {
+                  label: 'Speed',
+                  value: isLive && liveLocation ? `${Math.round(liveLocation.speed)} km/h` : '—',
+                  Icon: Gauge,
+                  color: '#1B365D',
+                },
+                {
+                  label: 'Status',
+                  value: isLive ? 'Live' : 'Idle',
+                  Icon: Bus,
+                  color: isLive ? '#22C55E' : '#6B7FA3',
+                },
+                {
+                  label: 'Updated',
+                  value: location ? timeAgo(location.updatedAt) : 'No data',
+                  Icon: RefreshCw,
+                  color: '#22C55E',
+                },
               ].map((stat, i) => {
                 const Icon = stat.Icon;
                 return (
@@ -219,44 +190,33 @@ export function LiveTrackingScreen({ onBack }: LiveTrackingScreenProps) {
               })}
             </View>
 
-            {/* Upcoming stops + contact button (expanded) */}
             {sheetExpanded && (
               <>
                 <View style={styles.upcomingStops}>
-                  <Text style={styles.upcomingStopsTitle}>Upcoming Stops</Text>
-                  {[
-                    { name: 'Karen Estate Stop B', eta: '7:22 AM', status: 'next' },
-                    { name: "Lang'ata Road Stop", eta: '7:31 AM', status: 'upcoming' },
-                    { name: 'Nairobi Academy Gate', eta: '7:45 AM', status: 'school' },
-                  ].map((stop, i) => (
-                    <View key={i} style={styles.stopItem}>
-                      <View
-                        style={[
-                          styles.stopDot,
-                          {
-                            backgroundColor:
-                              stop.status === 'next'
-                                ? '#F5C542'
-                                : stop.status === 'school'
-                                  ? '#1B365D'
-                                  : '#CBD5E1',
-                          },
-                        ]}
-                      />
-                      <Text style={styles.stopName}>{stop.name}</Text>
-                      <Text style={styles.stopEta}>{stop.eta}</Text>
-                    </View>
-                  ))}
+                  <Text style={styles.upcomingStopsTitle}>Route Stops</Text>
+                  {stops.length === 0 && (
+                    <Text style={styles.noStopsText}>No stops configured for this route.</Text>
+                  )}
+                  {[...stops]
+                    .sort((a, b) => a.sequence - b.sequence)
+                    .map((stop) => (
+                      <View key={stop.id} style={styles.stopItem}>
+                        <View style={styles.stopDot} />
+                        <Text style={styles.stopName}>{stop.name}</Text>
+                      </View>
+                    ))}
                 </View>
 
-                <TouchableOpacity
-                  onPress={handleCallSchool}
-                  style={styles.contactButton}
-                  activeOpacity={0.8}
-                >
-                  <Phone size={18} color="#1B365D" />
-                  <Text style={styles.contactButtonText}>Contact School</Text>
-                </TouchableOpacity>
+                {school?.phone && (
+                  <TouchableOpacity
+                    onPress={handleCallSchool}
+                    style={styles.contactButton}
+                    activeOpacity={0.8}
+                  >
+                    <Phone size={18} color="#1B365D" />
+                    <Text style={styles.contactButtonText}>Contact School</Text>
+                  </TouchableOpacity>
+                )}
               </>
             )}
           </View>
@@ -271,38 +231,13 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#E8F4FD',
   },
-  // Map
+  centered: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   mapContainer: {
     ...StyleSheet.absoluteFillObject,
   },
-  busMarker: {
-    position: 'absolute',
-    top: 280 - 24,
-    left: 175 - 24,
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#1B365D',
-    borderWidth: 4,
-    borderColor: '#F5C542',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  busPulse: {
-    position: 'absolute',
-    top: 280 - 30,
-    left: 175 - 30,
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: 'rgba(245,197,66,0.2)',
-  },
-  // Top overlay
   topOverlay: {
     position: 'absolute',
     top: 0,
@@ -349,64 +284,12 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#22C55E',
   },
   liveBadgeText: {
     color: '#1B365D',
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  // ETA card
-  etaCard: {
-    paddingHorizontal: 20,
-    marginTop: 12,
-  },
-  etaCardContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    borderRadius: 16,
-    padding: 16,
-    backgroundColor: '#1B365D',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  etaIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    backgroundColor: 'rgba(245,197,66,0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  etaInfo: {
-    flex: 1,
-  },
-  etaLabel: {
-    color: 'rgba(255,255,255,0.6)',
     fontSize: 12,
-  },
-  etaTime: {
-    color: '#F5C542',
-    fontSize: 21,
-    fontWeight: '800',
-  },
-  etaCountdown: {
-    alignItems: 'flex-end',
-  },
-  etaCountdownLabel: {
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: 11,
-  },
-  etaCountdownValue: {
-    color: '#ffffff',
-    fontSize: 18,
     fontWeight: '700',
   },
-  // Bottom sheet
   bottomSheet: {
     position: 'absolute',
     bottom: 0,
@@ -438,7 +321,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 2,
     flex: 1,
-    paddingBottom: 80,  // <-- ADD THIS: clears the BottomNav (~65px) + extra breathing room
+    paddingBottom: 16,
   },
   busInfoRow: {
     flexDirection: 'row',
@@ -454,20 +337,6 @@ const styles = StyleSheet.create({
   busDriver: {
     color: '#6B7FA3',
     fontSize: 13,
-  },
-  stopsBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-    backgroundColor: '#FFF8E1',
-  },
-  stopsBadgeText: {
-    color: '#1B365D',
-    fontSize: 12,
-    fontWeight: '600',
   },
   statsRow: {
     flexDirection: 'row',
@@ -491,7 +360,6 @@ const styles = StyleSheet.create({
     color: '#6B7FA3',
     fontSize: 10,
   },
-  // Upcoming stops
   upcomingStops: {
     marginBottom: 9,
   },
@@ -500,6 +368,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     marginBottom: 8,
+  },
+  noStopsText: {
+    color: '#6B7FA3',
+    fontSize: 13,
   },
   stopItem: {
     flexDirection: 'row',
@@ -511,6 +383,7 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
+    backgroundColor: '#F5C542',
   },
   stopName: {
     flex: 1,
@@ -518,12 +391,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '500',
   },
-  stopEta: {
-    color: '#6B7FA3',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  // Contact button
   contactButton: {
     flexDirection: 'row',
     alignItems: 'center',

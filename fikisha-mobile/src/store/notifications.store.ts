@@ -3,30 +3,37 @@ import { NotificationItem } from '@/types';
 
 interface NotificationsState {
   notifications: NotificationItem[];
-  addNotification: (notification: Omit<NotificationItem, 'id' | 'date' | 'time' | 'read'>) => void;
+  setNotifications: (items: NotificationItem[]) => void;
+  prependNotification: (item: Omit<NotificationItem, 'id' | 'isRead' | 'createdAt'>) => void;
   markAllRead: () => void;
   clearNotifications: () => void;
 }
 
 export const useNotificationsStore = create<NotificationsState>((set) => ({
   notifications: [],
-  addNotification: (notification) =>
+
+  setNotifications: (items) => set({ notifications: items }),
+
+  // Used for instant local feedback when a websocket event arrives; the
+  // authoritative copy (with its real id) replaces this the next time the
+  // notifications screen fetches from the server.
+  prependNotification: (item) =>
     set((state) => ({
       notifications: [
         {
-          id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-          type: notification.type,
-          title: notification.title,
-          body: notification.body,
-          date: notification.date || new Date().toLocaleDateString(),
-          time: notification.time || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          read: false,
+          id: `local-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+          isRead: false,
+          createdAt: new Date().toISOString(),
+          ...item,
         },
         ...state.notifications,
       ],
     })),
-  markAllRead: () => set((state) => ({
-    notifications: state.notifications.map((item) => ({ ...item, read: true })),
-  })),
+
+  markAllRead: () =>
+    set((state) => ({
+      notifications: state.notifications.map((item) => ({ ...item, isRead: true })),
+    })),
+
   clearNotifications: () => set({ notifications: [] }),
 }));

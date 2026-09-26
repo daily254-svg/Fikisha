@@ -4,6 +4,7 @@ import { AuthNavigation } from '../navigation/AuthNavigator';
 import { ParentNavigation } from '../navigation/ParentNavigator';
 import { DriverNavigation } from '../navigation/DriverNavigator';
 import { BottomNav } from './BottomNav';
+import { DriverBottomNav } from './DriverBottomNav';
 import type { Screen } from './types';
 
 const AUTH_SCREENS: Screen[] = ['splash', 'login', 'forgot-password', 'change-password'];
@@ -16,7 +17,13 @@ const DRIVER_SCREENS: Screen[] = [
   'driver-notifications',
   'driver-profile',
 ];
-const TAB_SCREENS: Screen[] = ['home', 'tracking', 'notifications', 'history', 'profile'];
+const PARENT_TAB_SCREENS: Screen[] = ['home', 'tracking', 'notifications', 'history', 'profile'];
+const DRIVER_TAB_SCREENS: Screen[] = [
+  'driver-home',
+  'driver-route',
+  'driver-notifications',
+  'driver-profile',
+];
 
 interface RootNavigationProps {
   screen: Screen;
@@ -40,7 +47,8 @@ export function RootNavigation({
   const isAuth = AUTH_SCREENS.includes(screen);
   const isParent = role === 'parent' && PARENT_SCREENS.includes(screen);
   const isDriver = role === 'driver' && DRIVER_SCREENS.includes(screen);
-  const showBottomNav = isParent && TAB_SCREENS.includes(screen);
+  const showParentBottomNav = isParent && PARENT_TAB_SCREENS.includes(screen);
+  const showDriverBottomNav = isDriver && DRIVER_TAB_SCREENS.includes(screen);
 
   return (
     <View style={styles.container}>
@@ -72,9 +80,8 @@ export function RootNavigation({
         )}
       </View>
 
-      {showBottomNav && (
-        <BottomNav active={screen} onNavigate={onNavigate} />
-      )}
+      {showParentBottomNav && <BottomNav active={screen} onNavigate={onNavigate} />}
+      {showDriverBottomNav && <DriverBottomNav active={screen} onNavigate={onNavigate} />}
     </View>
   );
 }

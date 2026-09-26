@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -16,33 +17,17 @@ import {
   MapPin,
   Search,
 } from 'lucide-react-native';
+import { driversService } from '@/services/drivers.service';
+import { trackingService } from '@/services/tracking.service';
+import { emitStudentPickup, emitStudentAbsent } from '@/lib/socket';
+import { useLocation } from '@/hooks/useLocation';
+import type { ActiveBusAssignment, RouteStudents, TransportEvent } from '@/types';
 
 interface DriverPickupScreenProps {
   onBack: () => void;
 }
 
-interface Student {
-  id: number;
-  name: string;
-  stop: string;
-  grade: string;
-  status: Status;
-}
-
 type Status = 'picked' | 'pending' | 'absent';
-
-const students: Student[] = [
-  { id: 1, name: 'Amani Omondi', stop: 'Karen Estate Stop A', grade: 'Grade 5', status: 'picked' },
-  { id: 2, name: 'Baraka Kamau', stop: 'Karen Estate Stop A', grade: 'Grade 3', status: 'picked' },
-  { id: 3, name: 'Cynthia Wanjiku', stop: 'Karen Estate Stop B', grade: 'Grade 6', status: 'pending' },
-  { id: 4, name: 'David Njoroge', stop: 'Karen Estate Stop B', grade: 'Grade 4', status: 'pending' },
-  { id: 5, name: 'Esther Akinyi', stop: 'Karen Estate Stop B', grade: 'Grade 2', status: 'pending' },
-  { id: 6, name: 'Felix Otieno', stop: "Lang'ata Road Stop", grade: 'Grade 5', status: 'pending' },
-  { id: 7, name: 'Grace Muthoni', stop: "Lang'ata Road Stop", grade: 'Grade 1', status: 'pending' },
-  { id: 8, name: 'Hassan Ali', stop: 'Westlands Stop A', grade: 'Grade 6', status: 'picked' },
-  { id: 9, name: 'Irene Chebet', stop: 'Westlands Stop A', grade: 'Grade 4', status: 'picked' },
-  { id: 10, name: 'James Kariuki', stop: 'Parklands Rd Stop', grade: 'Grade 3', status: 'absent' },
-];
 
 const statusColors: Record<Status, { bg: string; text: string; label: string }> = {
   picked: { bg: '#F0FDF4', text: '#22C55E', label: 'Picked Up' },
@@ -51,53 +36,109 @@ const statusColors: Record<Status, { bg: string; text: string; label: string }> 
 };
 
 export function DriverPickupScreen({ onBack }: DriverPickupScreenProps) {
-  const [statuses, setStatuses] = useState<Record<number, Status>>(
-    Object.fromEntries(students.map((s) => [s.id, s.status]))
-  );
+  const [isLoading, setIsLoading] = useState(true);
+  const [activeBus, setActiveBus] = useState<ActiveBusAssignment | null>(null);
+  const [routeStudents, setRouteStudents] = useState<RouteStudents[]>([]);
+  const [statuses, setStatuses] = useState<Record<string, Status>>({});
   const [filter, setFilter] = useState<'all' | Status>('all');
   const [search, setSearch] = useState('');
+  const location = useLocation(false);
 
-  const setStatus = (id: number, status: Status) => {
-    setStatuses((prev) => ({ ...prev, [id]: status }));
+  useEffect(() => {
+    (async () => {
+      try {
+        const [busRes, studentsRes] = await Promise.all([
+          driversService.getActiveBus(),
+          driversService.getRouteStudents(),
+        ]);
+        setActiveBus(busRes.data);
+        setRouteStudents(studentsRes.data);
+
+        if (busRes.data) {
+          const today = new Date().toISOString().slice(0, 10);
+          const eventsRes = await trackingService.getTransportEvents({
+            busId: busRes.data.bus.id,
+            date: today,
+          });
+          const initial: Record<string, Status> = {};
+          for (const event of eventsRes.data as TransportEvent[]) {
+            if (event.type === 'PICKED_UP') initial[event.studentId] = 'picked';
+            else if (event.type === 'ABSENT') initial[event.studentId] = 'absent';
+          }
+          setStatuses(initial);
+        }
+      } catch (e) {
+        console.error('Failed to load pickup list', e);
+      } finally {
+        setIsLoading(false);
+      }
+    })();
+  }, []);
+
+  const route = routeStudents[0]?.route;
+  const students = routeStudents[0]?.students ?? [];
+  const stopNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    (route?.stops ?? []).forEach((s) => map.set(s.id, s.name));
+    return map;
+  }, [route]);
+
+  const statusOf = (studentId: string): Status => statuses[studentId] ?? 'pending';
+
+  const setStatus = async (studentId: string, status: Status) => {
+    setStatuses((prev) => ({ ...prev, [studentId]: status }));
+    if (!activeBus) return;
+    const lat = location.latitude ?? undefined;
+    const lng = location.longitude ?? undefined;
+    if (status === 'picked') {
+      await emitStudentPickup(activeBus.bus.id, studentId, lat, lng);
+    } else if (status === 'absent') {
+      await emitStudentAbsent(activeBus.bus.id, studentId, lat, lng);
+    }
   };
 
   const filtered = students.filter((s) => {
-    const matchesFilter = filter === 'all' || statuses[s.id] === filter;
+    const stopName = s.pickupStopId ? stopNameById.get(s.pickupStopId) ?? '' : '';
+    const matchesFilter = filter === 'all' || statusOf(s.id) === filter;
+    const query = search.toLowerCase();
     const matchesSearch =
-      s.name.toLowerCase().includes(search.toLowerCase()) ||
-      s.stop.toLowerCase().includes(search.toLowerCase());
+      `${s.firstName} ${s.lastName}`.toLowerCase().includes(query) ||
+      stopName.toLowerCase().includes(query);
     return matchesFilter && matchesSearch;
   });
 
   const counts = {
-    picked: students.filter((s) => statuses[s.id] === 'picked').length,
-    pending: students.filter((s) => statuses[s.id] === 'pending').length,
-    absent: students.filter((s) => statuses[s.id] === 'absent').length,
+    picked: students.filter((s) => statusOf(s.id) === 'picked').length,
+    pending: students.filter((s) => statusOf(s.id) === 'pending').length,
+    absent: students.filter((s) => statusOf(s.id) === 'absent').length,
   };
 
   const statusKeys: Status[] = ['picked', 'pending', 'absent'];
 
+  if (isLoading) {
+    return (
+      <SafeAreaView style={[styles.container, styles.centered]}>
+        <ActivityIndicator color="#1B365D" size="large" />
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerTop}>
-          <TouchableOpacity
-            onPress={onBack}
-            style={styles.backButton}
-            activeOpacity={0.8}
-          >
+          <TouchableOpacity onPress={onBack} style={styles.backButton} activeOpacity={0.8}>
             <ArrowLeft size={18} color="#ffffff" />
           </TouchableOpacity>
           <View>
             <Text style={styles.headerTitle}>Student Pickup</Text>
             <Text style={styles.headerSubtitle}>
-              Morning Route A · Karen Estate Stop B
+              {route ? route.name : 'No route assigned'}
+              {activeBus ? ` · ${activeBus.bus.registrationNumber}` : ''}
             </Text>
           </View>
         </View>
 
-        {/* Stats */}
         <View style={styles.statsRow}>
           {statusKeys.map((key) => (
             <TouchableOpacity
@@ -106,10 +147,7 @@ export function DriverPickupScreen({ onBack }: DriverPickupScreenProps) {
               style={[
                 styles.statCard,
                 {
-                  backgroundColor:
-                    filter === key
-                      ? statusColors[key].text
-                      : 'rgba(255,255,255,0.1)',
+                  backgroundColor: filter === key ? statusColors[key].text : 'rgba(255,255,255,0.1)',
                   borderWidth: filter === key ? 0 : 1,
                   borderColor: 'rgba(255,255,255,0.15)',
                 },
@@ -120,12 +158,7 @@ export function DriverPickupScreen({ onBack }: DriverPickupScreenProps) {
               <Text
                 style={[
                   styles.statLabel,
-                  {
-                    color:
-                      filter === key
-                        ? 'rgba(255,255,255,0.8)'
-                        : 'rgba(255,255,255,0.5)',
-                  },
+                  { color: filter === key ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.5)' },
                 ]}
               >
                 {statusColors[key].label}
@@ -135,7 +168,6 @@ export function DriverPickupScreen({ onBack }: DriverPickupScreenProps) {
         </View>
       </View>
 
-      {/* Search */}
       <View style={styles.searchContainer}>
         <View style={styles.searchBar}>
           <Search size={16} color="#6B7FA3" />
@@ -150,15 +182,18 @@ export function DriverPickupScreen({ onBack }: DriverPickupScreenProps) {
         </View>
       </View>
 
-      {/* Student list */}
       <ScrollView
         style={styles.listContainer}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
       >
+        {students.length === 0 && (
+          <Text style={styles.emptyText}>No students assigned to your route yet.</Text>
+        )}
         {filtered.map((student) => {
-          const status = statuses[student.id];
+          const status = statusOf(student.id);
           const sc = statusColors[status];
+          const stopName = student.pickupStopId ? stopNameById.get(student.pickupStopId) : undefined;
           return (
             <View
               key={student.id}
@@ -180,21 +215,22 @@ export function DriverPickupScreen({ onBack }: DriverPickupScreenProps) {
                 </View>
 
                 <View style={styles.studentInfo}>
-                  <Text style={styles.studentName}>{student.name}</Text>
-                  <View style={styles.studentStop}>
-                    <MapPin size={12} color="#6B7FA3" />
-                    <Text style={styles.studentStopText}>{student.stop}</Text>
-                  </View>
+                  <Text style={styles.studentName}>
+                    {student.firstName} {student.lastName}
+                  </Text>
+                  {stopName && (
+                    <View style={styles.studentStop}>
+                      <MapPin size={12} color="#6B7FA3" />
+                      <Text style={styles.studentStopText}>{stopName}</Text>
+                    </View>
+                  )}
                 </View>
 
                 <View style={[styles.statusBadge, { backgroundColor: sc.bg }]}>
-                  <Text style={[styles.statusText, { color: sc.text }]}>
-                    {sc.label}
-                  </Text>
+                  <Text style={[styles.statusText, { color: sc.text }]}>{sc.label}</Text>
                 </View>
               </View>
 
-              {/* Action buttons */}
               {status !== 'picked' && (
                 <View style={styles.actionRow}>
                   <TouchableOpacity
@@ -215,16 +251,6 @@ export function DriverPickupScreen({ onBack }: DriverPickupScreenProps) {
                   </TouchableOpacity>
                 </View>
               )}
-
-              {status === 'picked' && (
-                <TouchableOpacity
-                  onPress={() => setStatus(student.id, 'pending')}
-                  style={styles.undoButton}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.undoText}>Undo</Text>
-                </TouchableOpacity>
-              )}
             </View>
           );
         })}
@@ -239,7 +265,10 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F7F9FC',
   },
-  // Header
+  centered: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   header: {
     backgroundColor: '#1B365D',
     paddingTop: 48,
@@ -287,7 +316,6 @@ const styles = StyleSheet.create({
   statLabel: {
     fontSize: 10,
   },
-  // Search
   searchContainer: {
     backgroundColor: '#ffffff',
     paddingHorizontal: 20,
@@ -311,13 +339,18 @@ const styles = StyleSheet.create({
     color: '#1B365D',
     fontSize: 14,
   },
-  // List
   listContainer: {
     flex: 1,
   },
   listContent: {
     padding: 20,
     gap: 12,
+  },
+  emptyText: {
+    color: '#6B7FA3',
+    fontSize: 14,
+    textAlign: 'center',
+    marginTop: 20,
   },
   studentCard: {
     borderRadius: 24,
@@ -365,7 +398,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
   },
-  // Action buttons
   actionRow: {
     flexDirection: 'row',
     gap: 8,
@@ -401,17 +433,6 @@ const styles = StyleSheet.create({
     color: '#EF4444',
     fontWeight: '700',
     fontSize: 14,
-  },
-  undoButton: {
-    width: '100%',
-    paddingVertical: 10,
-    borderRadius: 12,
-    backgroundColor: '#F7F9FC',
-    alignItems: 'center',
-  },
-  undoText: {
-    color: '#6B7FA3',
-    fontSize: 12,
   },
   bottomSpacer: {
     height: 24,

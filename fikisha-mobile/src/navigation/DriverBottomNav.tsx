@@ -1,22 +1,21 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { Home, Map, Bell, Clock, User2 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Home, Route as RouteIcon, Bell, User2 } from 'lucide-react-native';
 
-interface BottomNavProps {
+interface DriverBottomNavProps {
   active: string;
   onNavigate: (screen: string) => void;
 }
 
 const tabs = [
-  { id: 'home', icon: Home, label: 'Home' },
-  { id: 'tracking', icon: Map, label: 'Track' },
-  { id: 'notifications', icon: Bell, label: 'Alerts' },
-  { id: 'history', icon: Clock, label: 'History' },
-  { id: 'profile', icon: User2, label: 'Profile' },
+  { id: 'driver-home', icon: Home, label: 'Home' },
+  { id: 'driver-route', icon: RouteIcon, label: 'Route' },
+  { id: 'driver-notifications', icon: Bell, label: 'Alerts' },
+  { id: 'driver-profile', icon: User2, label: 'Profile' },
 ];
 
-export function BottomNav({ active, onNavigate }: BottomNavProps) {
+export function DriverBottomNav({ active, onNavigate }: DriverBottomNavProps) {
   const insets = useSafeAreaInsets();
 
   return (
@@ -28,10 +27,7 @@ export function BottomNav({ active, onNavigate }: BottomNavProps) {
           <TouchableOpacity
             key={tab.id}
             onPress={() => onNavigate(tab.id)}
-            style={[
-              styles.tab,
-              { backgroundColor: isActive ? '#FFF8E1' : 'transparent' },
-            ]}
+            style={[styles.tab, { backgroundColor: isActive ? '#FFF8E1' : 'transparent' }]}
             activeOpacity={0.7}
           >
             <Icon
@@ -42,10 +38,7 @@ export function BottomNav({ active, onNavigate }: BottomNavProps) {
             <Text
               style={[
                 styles.label,
-                {
-                  color: isActive ? '#1B365D' : '#6B7FA3',
-                  fontWeight: isActive ? '700' : '400',
-                },
+                { color: isActive ? '#1B365D' : '#6B7FA3', fontWeight: isActive ? '700' : '400' },
               ]}
             >
               {tab.label}
