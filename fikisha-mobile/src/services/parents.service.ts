@@ -1,8 +1,10 @@
 import { get } from './api';
 import { ENDPOINTS } from '@/constants/api';
+import type { ParentProfile, ParentStudentLink, StudentBusLocationResponse } from '@/types';
 
 export const parentsService = {
-  getProfile: () => get(ENDPOINTS.parents.me),
-  getStudents: () => get(ENDPOINTS.parents.students),
-  getStudentBus: (studentId: string) => get(ENDPOINTS.parents.studentBus(studentId)),
+  getProfile: (): Promise<{ data: ParentProfile }> => get(ENDPOINTS.parents.me),
+  getStudents: (): Promise<{ data: ParentStudentLink[] }> => get(ENDPOINTS.parents.students),
+  getStudentBus: (studentId: string): Promise<{ data: StudentBusLocationResponse }> =>
+    get(ENDPOINTS.parents.studentBus(studentId)),
 };

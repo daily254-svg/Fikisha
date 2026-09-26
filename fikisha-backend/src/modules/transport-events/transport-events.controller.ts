@@ -17,7 +17,7 @@ import { TransportEventType } from '../../../generated/prisma/client';
 
 @Controller('transport-events')
 @UseGuards(JwtAuthGuard, SchoolGuard, RolesGuard)
-@Roles('SCHOOL_ADMIN')
+@Roles('SCHOOL_ADMIN', 'DRIVER', 'PARENT')
 export class TransportEventsController {
   constructor(private readonly transportEventsService: TransportEventsService) {}
 
@@ -30,7 +30,7 @@ export class TransportEventsController {
     @Query('date') date?: string,
     @Query('limit', new DefaultValuePipe(100), ParseIntPipe) limit?: number,
   ) {
-    return this.transportEventsService.findAll(user.schoolId, {
+    return this.transportEventsService.findAll(user, {
       studentId,
       busId,
       type,

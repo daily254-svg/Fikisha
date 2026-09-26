@@ -35,6 +35,15 @@ export function DriverNavigation({
       {screen === 'driver-incident' && (
         <DriverIncidentScreen onBack={() => onNavigate('driver-home')} />
       )}
+      {screen === 'driver-notifications' && (
+        <DriverNotificationsScreen onBack={() => onNavigate('driver-home')} />
+      )}
+      {screen === 'driver-profile' && (
+        <DriverProfileScreen
+          onBack={() => onNavigate('driver-home')}
+          onLogout={onLogout}
+        />
+      )}
     </View>
   );
 }

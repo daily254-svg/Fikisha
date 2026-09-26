@@ -20,6 +20,7 @@ export interface ParentProfile {
 export interface Bus {
   id: string;
   registrationNumber: string;
+  capacity?: number;
   location?: {
     lat: number;
     lng: number;

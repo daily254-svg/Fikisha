@@ -11,4 +11,6 @@ export type Screen =
   | 'driver-home'
   | 'driver-route'
   | 'driver-pickup'
-  | 'driver-incident';
+  | 'driver-incident'
+  | 'driver-notifications'
+  | 'driver-profile';

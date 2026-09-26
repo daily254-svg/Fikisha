@@ -1,28 +1,106 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   Bell,
   MapPin,
   Users,
-  Clock,
   Play,
   ChevronRight,
   Bus,
   AlertTriangle,
+  User2,
 } from 'lucide-react-native';
+import { driversService } from '@/services/drivers.service';
+import { trackingService } from '@/services/tracking.service';
+import type { DriverProfile, ActiveBusAssignment, RouteStudents } from '@/types';
 
 interface DriverDashboardProps {
   onNavigate: (screen: string) => void;
 }
 
+function greeting() {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Good Morning';
+  if (hour < 17) return 'Good Afternoon';
+  return 'Good Evening';
+}
+
 export function DriverDashboard({ onNavigate }: DriverDashboardProps) {
+  const [isLoading, setIsLoading] = useState(true);
+  const [driver, setDriver] = useState<DriverProfile | null>(null);
+  const [activeBus, setActiveBus] = useState<ActiveBusAssignment | null>(null);
+  const [routeStudents, setRouteStudents] = useState<RouteStudents[]>([]);
+  const [pickedUpToday, setPickedUpToday] = useState(0);
+  const [absentToday, setAbsentToday] = useState(0);
+
+  useEffect(() => {
+    let mounted = true;
+
+    (async () => {
+      try {
+        const [profileRes, busRes, studentsRes] = await Promise.all([
+          driversService.getProfile(),
+          driversService.getActiveBus(),
+          driversService.getRouteStudents(),
+        ]);
+        if (!mounted) return;
+
+        setDriver(profileRes.data);
+        setActiveBus(busRes.data);
+        setRouteStudents(studentsRes.data);
+
+        if (busRes.data) {
+          const today = new Date().toISOString().slice(0, 10);
+          const eventsRes = await trackingService.getTransportEvents({
+            busId: busRes.data.bus.id,
+            date: today,
+          });
+          if (!mounted) return;
+
+          const pickedUpIds = new Set(
+            eventsRes.data.filter((e) => e.type === 'PICKED_UP').map((e) => e.studentId)
+          );
+          const absentIds = new Set(
+            eventsRes.data.filter((e) => e.type === 'ABSENT').map((e) => e.studentId)
+          );
+          setPickedUpToday(pickedUpIds.size);
+          setAbsentToday(absentIds.size);
+        }
+      } catch (e) {
+        console.error('Failed to load driver dashboard', e);
+      } finally {
+        if (mounted) setIsLoading(false);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const driverName = driver?.user?.name || 'Driver';
+  const bus = activeBus?.bus;
+  const route = bus?.routes?.[0];
+  const totalStudents = routeStudents.reduce((sum, r) => sum + r.students.length, 0);
+  const pendingToday = Math.max(totalStudents - pickedUpToday - absentToday, 0);
+  const pickupPercent = totalStudents > 0 ? Math.round((pickedUpToday / totalStudents) * 100) : 0;
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={[styles.container, styles.centered]}>
+        <ActivityIndicator color="#1B365D" size="large" />
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView
@@ -33,17 +111,21 @@ export function DriverDashboard({ onNavigate }: DriverDashboardProps) {
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.headerTop}>
-            <View style={styles.profileSection}>
+            <TouchableOpacity
+              style={styles.profileSection}
+              onPress={() => onNavigate('driver-profile')}
+              activeOpacity={0.8}
+            >
               <View style={styles.avatar}>
-                <Bus size={26} color="#1B365D" />
+                <User2 size={24} color="#1B365D" />
               </View>
               <View>
-                <Text style={styles.greeting}>Good Morning</Text>
-                <Text style={styles.driverName}>James Mwangi</Text>
+                <Text style={styles.greeting}>{greeting()}</Text>
+                <Text style={styles.driverName}>{driverName}</Text>
               </View>
-            </View>
+            </TouchableOpacity>
             <TouchableOpacity
-              onPress={() => onNavigate('driver-incident')}
+              onPress={() => onNavigate('driver-notifications')}
               style={styles.notificationButton}
               activeOpacity={0.8}
             >
@@ -52,124 +134,138 @@ export function DriverDashboard({ onNavigate }: DriverDashboardProps) {
           </View>
 
           {/* Bus card */}
-          <View style={styles.busCard}>
-            <View style={styles.busCardTop}>
-              <View>
-                <Text style={styles.busLabel}>Assigned Vehicle</Text>
-                <Text style={styles.busPlate}>KCA 345G</Text>
-              </View>
-              <View style={styles.statusBadge}>
-                <View style={styles.statusDot} />
-                <Text style={styles.statusText}>Ready</Text>
-              </View>
-            </View>
-            <View style={styles.busStats}>
-              {[
-                { label: 'Capacity', value: '28' },
-                { label: 'Students', value: '22' },
-                { label: 'Stops', value: '8' },
-              ].map((s, i) => (
-                <View key={i} style={styles.busStat}>
-                  <Text style={styles.busStatValue}>{s.value}</Text>
-                  <Text style={styles.busStatLabel}>{s.label}</Text>
+          {bus ? (
+            <View style={styles.busCard}>
+              <View style={styles.busCardTop}>
+                <View>
+                  <Text style={styles.busLabel}>Assigned Vehicle</Text>
+                  <Text style={styles.busPlate}>{bus.registrationNumber}</Text>
                 </View>
-              ))}
+              </View>
+              <View style={styles.busStats}>
+                {[
+                  { label: 'Capacity', value: bus.capacity ? String(bus.capacity) : '—' },
+                  { label: 'Students', value: String(totalStudents) },
+                  { label: 'Stops', value: String(route?.stops?.length ?? 0) },
+                ].map((s, i) => (
+                  <View key={i} style={styles.busStat}>
+                    <Text style={styles.busStatValue}>{s.value}</Text>
+                    <Text style={styles.busStatLabel}>{s.label}</Text>
+                  </View>
+                ))}
+              </View>
             </View>
-          </View>
+          ) : (
+            <View style={styles.busCard}>
+              <Text style={styles.noBusText}>
+                You haven't been assigned to a bus yet. Contact your school
+                administrator.
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Body */}
         <View style={styles.body}>
-          {/* Today's route card */}
-          <View style={styles.routeCard}>
-            <View style={styles.routeCardHeader}>
-              <View>
-                <Text style={styles.routeLabel}>TODAY'S ROUTE</Text>
-                <Text style={styles.routeName}>Morning Route A</Text>
+          {route && (
+            <View style={styles.routeCard}>
+              <View style={styles.routeCardHeader}>
+                <View>
+                  <Text style={styles.routeLabel}>
+                    {route.direction === 'MORNING' ? "TODAY'S MORNING ROUTE" : "TODAY'S EVENING ROUTE"}
+                  </Text>
+                  <Text style={styles.routeName}>{route.name}</Text>
+                </View>
+                <View style={styles.routeIcon}>
+                  <MapPin size={20} color="#F5C542" />
+                </View>
               </View>
-              <View style={styles.routeIcon}>
-                <MapPin size={20} color="#F5C542" />
-              </View>
-            </View>
 
-            <View style={styles.routeGrid}>
-              {[
-                { icon: <Users size={16} color="#1B365D" />, label: 'Students', value: '22 assigned' },
-                { icon: <Clock size={16} color="#1B365D" />, label: 'Start Time', value: '6:45 AM' },
-                { icon: <MapPin size={16} color="#1B365D" />, label: 'First Stop', value: 'Westlands A' },
-                { icon: <Clock size={16} color="#1B365D" />, label: 'School ETA', value: '7:50 AM' },
-              ].map((item, i) => (
-                <View key={i} style={styles.routeGridItem}>
+              <View style={styles.routeGrid}>
+                <View style={styles.routeGridItem}>
                   <View style={styles.routeGridIcon}>
-                    {item.icon}
+                    <Users size={16} color="#1B365D" />
                   </View>
                   <View>
-                    <Text style={styles.routeGridLabel}>{item.label}</Text>
-                    <Text style={styles.routeGridValue}>{item.value}</Text>
+                    <Text style={styles.routeGridLabel}>Students</Text>
+                    <Text style={styles.routeGridValue}>{totalStudents} assigned</Text>
                   </View>
                 </View>
-              ))}
-            </View>
+                <View style={styles.routeGridItem}>
+                  <View style={styles.routeGridIcon}>
+                    <MapPin size={16} color="#1B365D" />
+                  </View>
+                  <View>
+                    <Text style={styles.routeGridLabel}>First Stop</Text>
+                    <Text style={styles.routeGridValue}>
+                      {route.stops?.[0]?.name ?? '—'}
+                    </Text>
+                  </View>
+                </View>
+              </View>
 
-            {/* Action buttons */}
-            <View style={styles.actionButtons}>
-              <TouchableOpacity
-                onPress={() => onNavigate('driver-route')}
-                style={[styles.actionButton, styles.startButton]}
-                activeOpacity={0.8}
-              >
-                <Play size={20} color="#1B365D" fill="#1B365D" />
-                <Text style={styles.startButtonText}>Start Route</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => onNavigate('driver-pickup')}
-                style={[styles.actionButton, styles.studentsButton]}
-                activeOpacity={0.8}
-              >
-                <Users size={20} color="#1B365D" />
-                <Text style={styles.studentsButtonText}>Students</Text>
-              </TouchableOpacity>
+              <View style={styles.actionButtons}>
+                <TouchableOpacity
+                  onPress={() => onNavigate('driver-route')}
+                  style={[styles.actionButton, styles.startButton]}
+                  activeOpacity={0.8}
+                >
+                  <Play size={20} color="#1B365D" fill="#1B365D" />
+                  <Text style={styles.startButtonText}>Start Route</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => onNavigate('driver-pickup')}
+                  style={[styles.actionButton, styles.studentsButton]}
+                  activeOpacity={0.8}
+                >
+                  <Users size={20} color="#1B365D" />
+                  <Text style={styles.studentsButtonText}>Students</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
+          )}
 
           {/* Pickup Progress */}
-          <View style={styles.progressCard}>
-            <View style={styles.progressHeader}>
-              <Text style={styles.progressTitle}>Pickup Progress</Text>
-              <TouchableOpacity onPress={() => onNavigate('driver-pickup')}>
-                <Text style={styles.progressViewAll}>View all</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Progress bar */}
-            <View style={styles.progressBarContainer}>
-              <View style={styles.progressBarLabels}>
-                <Text style={styles.progressBarText}>18 of 22 picked up</Text>
-                <Text style={styles.progressBarPercent}>82%</Text>
+          {totalStudents > 0 && (
+            <View style={styles.progressCard}>
+              <View style={styles.progressHeader}>
+                <Text style={styles.progressTitle}>Today's Pickup Progress</Text>
+                <TouchableOpacity onPress={() => onNavigate('driver-pickup')}>
+                  <Text style={styles.progressViewAll}>View all</Text>
+                </TouchableOpacity>
               </View>
-              <View style={styles.progressBarBg}>
-                <View style={[styles.progressBarFill, { width: '82%' }]} />
-              </View>
-            </View>
 
-            <View style={styles.progressStats}>
-              {[
-                { label: 'Picked Up', count: 18, color: '#22C55E' },
-                { label: 'Pending', count: 3, color: '#F5C542' },
-                { label: 'Absent', count: 1, color: '#EF4444' },
-              ].map((s, i) => (
-                <View
-                  key={i}
-                  style={[styles.progressStat, { backgroundColor: `${s.color}15` }]}
-                >
-                  <Text style={[styles.progressStatCount, { color: s.color }]}>
-                    {s.count}
+              <View style={styles.progressBarContainer}>
+                <View style={styles.progressBarLabels}>
+                  <Text style={styles.progressBarText}>
+                    {pickedUpToday} of {totalStudents} picked up
                   </Text>
-                  <Text style={styles.progressStatLabel}>{s.label}</Text>
+                  <Text style={styles.progressBarPercent}>{pickupPercent}%</Text>
                 </View>
-              ))}
+                <View style={styles.progressBarBg}>
+                  <View style={[styles.progressBarFill, { width: `${pickupPercent}%` }]} />
+                </View>
+              </View>
+
+              <View style={styles.progressStats}>
+                {[
+                  { label: 'Picked Up', count: pickedUpToday, color: '#22C55E' },
+                  { label: 'Pending', count: pendingToday, color: '#F5C542' },
+                  { label: 'Absent', count: absentToday, color: '#EF4444' },
+                ].map((s, i) => (
+                  <View
+                    key={i}
+                    style={[styles.progressStat, { backgroundColor: `${s.color}15` }]}
+                  >
+                    <Text style={[styles.progressStatCount, { color: s.color }]}>
+                      {s.count}
+                    </Text>
+                    <Text style={styles.progressStatLabel}>{s.label}</Text>
+                  </View>
+                ))}
+              </View>
             </View>
-          </View>
+          )}
 
           {/* Report incident */}
           <TouchableOpacity
@@ -198,6 +294,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F7F9FC',
+  },
+  centered: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   scrollView: {
     flex: 1,
@@ -256,6 +356,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.15)',
   },
+  noBusText: {
+    color: 'rgba(255,255,255,0.75)',
+    fontSize: 13,
+    lineHeight: 19,
+  },
   busCardTop: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -271,33 +376,11 @@ const styles = StyleSheet.create({
     fontSize: 19,
     fontWeight: '800',
   },
-  statusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-    backgroundColor: 'rgba(34,197,94,0.2)',
-  },
-  statusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#22C55E',
-  },
-  statusText: {
-    color: '#22C55E',
-    fontSize: 12,
-    fontWeight: '700',
-  },
   busStats: {
     flexDirection: 'row',
     gap: 16,
   },
-  busStat: {
-    // flex children
-  },
+  busStat: {},
   busStatValue: {
     color: '#ffffff',
     fontSize: 16,

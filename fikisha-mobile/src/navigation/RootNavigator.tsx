@@ -4,25 +4,18 @@ import { AuthNavigation } from '../navigation/AuthNavigator';
 import { ParentNavigation } from '../navigation/ParentNavigator';
 import { DriverNavigation } from '../navigation/DriverNavigator';
 import { BottomNav } from './BottomNav';
-
-type Screen =
-  | 'splash'
-  | 'login'
-  | 'forgot-password'
-  | 'change-password'
-  | 'home'
-  | 'tracking'
-  | 'notifications'
-  | 'history'
-  | 'profile'
-  | 'driver-home'
-  | 'driver-route'
-  | 'driver-pickup'
-  | 'driver-incident';
+import type { Screen } from './types';
 
 const AUTH_SCREENS: Screen[] = ['splash', 'login', 'forgot-password', 'change-password'];
 const PARENT_SCREENS: Screen[] = ['home', 'tracking', 'notifications', 'history', 'profile'];
-const DRIVER_SCREENS: Screen[] = ['driver-home', 'driver-route', 'driver-pickup', 'driver-incident'];
+const DRIVER_SCREENS: Screen[] = [
+  'driver-home',
+  'driver-route',
+  'driver-pickup',
+  'driver-incident',
+  'driver-notifications',
+  'driver-profile',
+];
 const TAB_SCREENS: Screen[] = ['home', 'tracking', 'notifications', 'history', 'profile'];
 
 interface RootNavigationProps {

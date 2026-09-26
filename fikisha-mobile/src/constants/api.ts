@@ -26,4 +26,7 @@ export const ENDPOINTS = {
       `/tracking/buses/${busId}/history`,
   },
   transportEvents: '/transport-events',
+  schools: {
+    byId: (schoolId: string) => `/schools/${schoolId}`,
+  },
 } as const

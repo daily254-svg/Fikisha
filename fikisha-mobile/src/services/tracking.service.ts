@@ -13,6 +13,6 @@ export const trackingService = {
     busId?: string;
     type?: string;
     date?: string;
-  }) =>
-    get('/transport-events', filters),
+    limit?: number;
+  }): Promise<{ data: TransportEvent[] }> => get('/transport-events', filters),
 };
