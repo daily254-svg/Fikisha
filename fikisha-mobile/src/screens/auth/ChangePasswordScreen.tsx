@@ -12,7 +12,7 @@ import {
   StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Lock, Eye, EyeOff, CheckCircle } from 'lucide-react-native';
+import { Lock, Eye, EyeOff } from 'lucide-react-native';
 import { authService } from '@/services/auth.service';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -25,6 +25,8 @@ export function ChangePasswordScreen({
   onPasswordChanged,
   phoneNumber,
 }: ChangePasswordScreenProps) {
+  const { setFirstLoginDone } = useAuth();
+
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -34,7 +36,7 @@ export function ChangePasswordScreen({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const handleChangePassword = () => {
+  const handleChangePassword = async () => {
     setError('');
 
     if (currentPassword !== phoneNumber) {
@@ -57,49 +59,31 @@ export function ChangePasswordScreen({
       return;
     }
 
-    const { setFirstLoginDone } = useAuth();
-
     setIsLoading(true);
-    (async () => {
-      try {
-        await authService.changePassword({ currentPassword, newPassword });
-        setFirstLoginDone();
-        onPasswordChanged();
-      } catch (err: any) {
-        console.error(err);
-        setError(err?.message || 'Failed to change password');
-      } finally {
-        setIsLoading(false);
-      }
-    })();
+    try {
+      await authService.changePassword({ currentPassword, newPassword });
+      setFirstLoginDone();
+      onPasswordChanged();
+    } catch (err: any) {
+      setError(
+        err?.response?.data?.message ?? err?.message ?? 'Failed to change password'
+      );
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const passwordStrength =
-    newPassword.length >= 8
-      ? 'Strong'
-      : newPassword.length >= 6
-        ? 'Medium'
-        : newPassword.length > 0
-          ? 'Weak'
-          : '';
+    newPassword.length >= 8 ? 'Strong' : newPassword.length >= 6 ? 'Medium' : newPassword.length > 0 ? 'Weak' : '';
 
   const strengthColor =
-    passwordStrength === 'Strong'
-      ? '#22C55E'
-      : passwordStrength === 'Medium'
-        ? '#F97316'
-        : '#EF4444';
+    passwordStrength === 'Strong' ? '#16A34A' : passwordStrength === 'Medium' ? '#D97706' : '#DC2626';
 
-  const strengthWidth =
-    passwordStrength === 'Weak'
-      ? '33%'
-      : passwordStrength === 'Medium'
-        ? '66%'
-        : '100%';
+  const strengthWidth = passwordStrength === 'Weak' ? '33%' : passwordStrength === 'Medium' ? '66%' : '100%';
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#1B365D" translucent />
+      <StatusBar barStyle="dark-content" backgroundColor="#F7F9FC" />
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -109,155 +93,130 @@ export function ChangePasswordScreen({
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
         >
-          <View style={styles.background}>
-            <View style={styles.content}>
-              <View style={styles.iconContainer}>
-                <View style={styles.iconCircle}>
-                  <Lock size={32} color="#1B365D" />
+          <View style={styles.content}>
+            <View style={styles.iconCircle}>
+              <Lock size={28} color="#1B365D" />
+            </View>
+
+            <Text style={styles.title}>Set a new password</Text>
+            <Text style={styles.subtitle}>
+              For security, please change your default password before continuing
+            </Text>
+
+            <View style={styles.form}>
+              <View style={styles.fieldContainer}>
+                <Text style={styles.label}>Current Password</Text>
+                <View style={styles.inputWrapper}>
+                  <Lock size={18} color="#6B7FA3" />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Your phone number"
+                    placeholderTextColor="#A0B0C8"
+                    value={currentPassword}
+                    onChangeText={setCurrentPassword}
+                    secureTextEntry={!showCurrent}
+                    autoCapitalize="none"
+                    editable={!isLoading}
+                  />
+                  <TouchableOpacity onPress={() => setShowCurrent(!showCurrent)}>
+                    {showCurrent ? (
+                      <EyeOff size={18} color="#6B7FA3" />
+                    ) : (
+                      <Eye size={18} color="#6B7FA3" />
+                    )}
+                  </TouchableOpacity>
                 </View>
               </View>
 
-              <Text style={styles.title}>Change Password</Text>
-              <Text style={styles.subtitle}>
-                For security, please change your default password
-              </Text>
-
-              <View style={styles.form}>
-                {/* Current Password */}
-                <View style={styles.fieldContainer}>
-                  <Text style={styles.label}>Current Password</Text>
-                  <View style={styles.inputWrapper}>
-                    <Lock size={20} color="rgba(27,54,93,0.6)" />
-                    <TextInput
-                      style={styles.input}
-                      placeholder="Enter current password"
-                      placeholderTextColor="#A0B0C8"
-                      value={currentPassword}
-                      onChangeText={setCurrentPassword}
-                      secureTextEntry={!showCurrent}
-                      autoCapitalize="none"
-                    />
-                    <TouchableOpacity
-                      onPress={() => setShowCurrent(!showCurrent)}
-                    >
-                      {showCurrent ? (
-                        <EyeOff size={20} color="#1B365D" />
-                      ) : (
-                        <Eye size={20} color="#1B365D" />
-                      )}
-                    </TouchableOpacity>
-                  </View>
+              <View style={styles.fieldContainer}>
+                <Text style={styles.label}>New Password</Text>
+                <View style={styles.inputWrapper}>
+                  <Lock size={18} color="#6B7FA3" />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Enter new password"
+                    placeholderTextColor="#A0B0C8"
+                    value={newPassword}
+                    onChangeText={setNewPassword}
+                    secureTextEntry={!showNew}
+                    autoCapitalize="none"
+                    editable={!isLoading}
+                  />
+                  <TouchableOpacity onPress={() => setShowNew(!showNew)}>
+                    {showNew ? (
+                      <EyeOff size={18} color="#6B7FA3" />
+                    ) : (
+                      <Eye size={18} color="#6B7FA3" />
+                    )}
+                  </TouchableOpacity>
                 </View>
-
-                {/* New Password */}
-                <View style={styles.fieldContainer}>
-                  <Text style={styles.label}>New Password</Text>
-                  <View style={styles.inputWrapper}>
-                    <Lock size={20} color="rgba(27,54,93,0.6)" />
-                    <TextInput
-                      style={styles.input}
-                      placeholder="Enter new password"
-                      placeholderTextColor="#A0B0C8"
-                      value={newPassword}
-                      onChangeText={setNewPassword}
-                      secureTextEntry={!showNew}
-                      autoCapitalize="none"
-                    />
-                    <TouchableOpacity onPress={() => setShowNew(!showNew)}>
-                      {showNew ? (
-                        <EyeOff size={20} color="#1B365D" />
-                      ) : (
-                        <Eye size={20} color="#1B365D" />
-                      )}
-                    </TouchableOpacity>
-                  </View>
-                  {passwordStrength !== '' && (
-                    <View style={styles.strengthContainer}>
-                      <View style={styles.strengthBarBg}>
-                        <View
-                          style={[
-                            styles.strengthBarFill,
-                            {
-                              width: strengthWidth as any,
-                              backgroundColor: strengthColor,
-                            },
-                          ]}
-                        />
-                      </View>
-                      <Text
-                        style={[styles.strengthText, { color: strengthColor }]}
-                      >
-                        {passwordStrength}
-                      </Text>
+                {passwordStrength !== '' && (
+                  <View style={styles.strengthContainer}>
+                    <View style={styles.strengthBarBg}>
+                      <View
+                        style={[
+                          styles.strengthBarFill,
+                          { width: strengthWidth as any, backgroundColor: strengthColor },
+                        ]}
+                      />
                     </View>
-                  )}
-                </View>
-
-                {/* Confirm Password */}
-                <View style={styles.fieldContainer}>
-                  <Text style={styles.label}>Confirm New Password</Text>
-                  <View style={styles.inputWrapper}>
-                    <Lock size={20} color="rgba(27,54,93,0.6)" />
-                    <TextInput
-                      style={styles.input}
-                      placeholder="Confirm new password"
-                      placeholderTextColor="#A0B0C8"
-                      value={confirmPassword}
-                      onChangeText={setConfirmPassword}
-                      secureTextEntry={!showConfirm}
-                      autoCapitalize="none"
-                    />
-                    <TouchableOpacity
-                      onPress={() => setShowConfirm(!showConfirm)}
-                    >
-                      {showConfirm ? (
-                        <EyeOff size={20} color="#1B365D" />
-                      ) : (
-                        <Eye size={20} color="#1B365D" />
-                      )}
-                    </TouchableOpacity>
-                  </View>
-                </View>
-
-                {/* Error Message */}
-                {error !== '' && (
-                  <View style={styles.errorContainer}>
-                    <Text style={styles.errorText}>{error}</Text>
+                    <Text style={[styles.strengthText, { color: strengthColor }]}>
+                      {passwordStrength}
+                    </Text>
                   </View>
                 )}
+              </View>
 
-                {/* Change Password Button */}
-                <TouchableOpacity
-                  onPress={handleChangePassword}
-                  disabled={
-                    isLoading ||
-                    !currentPassword ||
-                    !newPassword ||
-                    !confirmPassword
-                  }
-                  style={[
-                    styles.changeButton,
-                    (!currentPassword || !newPassword || !confirmPassword || isLoading) &&
-                      styles.changeButtonDisabled,
-                  ]}
-                  activeOpacity={0.8}
-                >
-                  {isLoading ? (
-                    <ActivityIndicator color="#1B365D" size="small" />
-                  ) : (
-                    <Text style={styles.changeButtonText}>Change Password</Text>
-                  )}
-                </TouchableOpacity>
-
-                {/* Info */}
-                <View style={styles.infoContainer}>
-                  <CheckCircle size={16} color="#F5C542" style={styles.infoIcon} />
-                  <Text style={styles.infoText}>
-                    Your password must be at least 6 characters long and
-                    different from your phone number
-                  </Text>
+              <View style={styles.fieldContainer}>
+                <Text style={styles.label}>Confirm New Password</Text>
+                <View style={styles.inputWrapper}>
+                  <Lock size={18} color="#6B7FA3" />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Confirm new password"
+                    placeholderTextColor="#A0B0C8"
+                    value={confirmPassword}
+                    onChangeText={setConfirmPassword}
+                    secureTextEntry={!showConfirm}
+                    autoCapitalize="none"
+                    editable={!isLoading}
+                  />
+                  <TouchableOpacity onPress={() => setShowConfirm(!showConfirm)}>
+                    {showConfirm ? (
+                      <EyeOff size={18} color="#6B7FA3" />
+                    ) : (
+                      <Eye size={18} color="#6B7FA3" />
+                    )}
+                  </TouchableOpacity>
                 </View>
               </View>
+
+              {error !== '' && (
+                <View style={styles.errorContainer}>
+                  <Text style={styles.errorText}>{error}</Text>
+                </View>
+              )}
+
+              <TouchableOpacity
+                onPress={handleChangePassword}
+                disabled={isLoading || !currentPassword || !newPassword || !confirmPassword}
+                style={[
+                  styles.changeButton,
+                  (!currentPassword || !newPassword || !confirmPassword || isLoading) &&
+                    styles.changeButtonDisabled,
+                ]}
+                activeOpacity={0.85}
+              >
+                {isLoading ? (
+                  <ActivityIndicator color="#ffffff" size="small" />
+                ) : (
+                  <Text style={styles.changeButtonText}>Change Password</Text>
+                )}
+              </TouchableOpacity>
+
+              <Text style={styles.infoText}>
+                Must be at least 6 characters and different from your phone number.
+              </Text>
             </View>
           </View>
         </ScrollView>
@@ -269,7 +228,7 @@ export function ChangePasswordScreen({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1B365D',
+    backgroundColor: '#F7F9FC',
   },
   flex: {
     flex: 1,
@@ -277,42 +236,36 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
   },
-  background: {
-    flex: 1,
-    backgroundColor: '#1B365D',
-  },
   content: {
     flex: 1,
     justifyContent: 'center',
     paddingHorizontal: 24,
-    paddingTop: 64,
-    paddingBottom: 80,
-  },
-  iconContainer: {
-    alignItems: 'center',
-    marginBottom: 32,
+    paddingTop: 48,
+    paddingBottom: 48,
   },
   iconCircle: {
+    alignSelf: 'center',
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: '#F5C542',
+    backgroundColor: '#EFF2F7',
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: 24,
   },
   title: {
-    fontSize: 30,
+    fontSize: 22,
     fontWeight: '700',
-    color: 'white',
+    color: '#1B365D',
     textAlign: 'center',
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 14,
-    color: 'rgba(255,255,255,0.7)',
+    color: '#6B7FA3',
     textAlign: 'center',
     paddingHorizontal: 16,
-    marginBottom: 40,
+    marginBottom: 32,
   },
   form: {
     gap: 16,
@@ -321,24 +274,26 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   label: {
-    color: 'rgba(255,255,255,0.8)',
+    color: '#1B365D',
     fontSize: 14,
+    fontWeight: '600',
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'white',
-    borderRadius: 12,
+    backgroundColor: '#ffffff',
+    borderRadius: 14,
     paddingHorizontal: 16,
     gap: 12,
-    height: 56,
+    height: 52,
+    borderWidth: 1.5,
+    borderColor: 'rgba(27,54,93,0.12)',
   },
   input: {
     flex: 1,
     color: '#1B365D',
     fontSize: 15,
   },
-  // Password strength
   strengthContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -348,7 +303,7 @@ const styles = StyleSheet.create({
   strengthBarBg: {
     flex: 1,
     height: 4,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: 'rgba(27,54,93,0.1)',
     borderRadius: 2,
     overflow: 'hidden',
   },
@@ -358,51 +313,37 @@ const styles = StyleSheet.create({
   },
   strengthText: {
     fontSize: 12,
-    color: 'rgba(255,255,255,0.8)',
+    fontWeight: '600',
   },
-  // Error
   errorContainer: {
     padding: 12,
-    borderRadius: 8,
-    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    borderRadius: 12,
+    backgroundColor: 'rgba(239, 68, 68, 0.08)',
   },
   errorText: {
-    color: '#FCA5A5',
+    color: '#DC2626',
     fontSize: 14,
   },
-  // Change button
   changeButton: {
-    height: 56,
-    borderRadius: 12,
-    backgroundColor: '#F5C542',
+    height: 52,
+    borderRadius: 14,
+    backgroundColor: '#1B365D',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 24,
+    marginTop: 8,
   },
   changeButtonDisabled: {
-    opacity: 0.5,
+    opacity: 0.6,
   },
   changeButtonText: {
-    color: '#1B365D',
+    color: '#ffffff',
     fontSize: 16,
     fontWeight: '600',
   },
-  // Info
-  infoContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
-    padding: 12,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    marginTop: 16,
-  },
-  infoIcon: {
-    marginTop: 2,
-  },
   infoText: {
-    flex: 1,
-    color: 'rgba(255,255,255,0.7)',
+    textAlign: 'center',
+    color: '#6B7FA3',
     fontSize: 12,
+    marginTop: 4,
   },
 });

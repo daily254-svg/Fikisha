@@ -30,9 +30,8 @@ interface RootNavigationProps {
   role: 'parent' | 'driver';
   userPhone: string;
   onNavigate: (screen: string) => void;
-  onLogin: (role: 'parent' | 'driver', phone: string, password: string) => void;
+  onLogin: (phone: string, password: string) => Promise<void>;
   onPasswordChanged: () => void;
-  onResetSent: () => void;
   onLogout: () => void;
 }
 
@@ -43,7 +42,6 @@ export function RootNavigation({
   onNavigate,
   onLogin,
   onPasswordChanged,
-  onResetSent,
   onLogout,
 }: RootNavigationProps) {
   const isAuth = AUTH_SCREENS.includes(screen);
@@ -58,11 +56,9 @@ export function RootNavigation({
           <AuthNavigation
             screen={screen}
             userPhone={userPhone}
-            role={role}
             onNavigate={onNavigate}
             onLogin={onLogin}
             onPasswordChanged={onPasswordChanged}
-            onResetSent={onResetSent}
           />
         )}
 

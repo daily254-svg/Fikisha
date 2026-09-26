@@ -4,11 +4,13 @@ import { useNotificationsStore } from '@/store/notifications.store';
 import { connectSocket, disconnectSocket, getSocket } from '@/lib/socket';
 import { GpsUpdate } from '@/types';
 
-export function useWebSocket() {
+export function useWebSocket(enabled: boolean = true) {
   const { updateBusLocation } = useTrackingStore();
   const { addNotification } = useNotificationsStore();
 
   useEffect(() => {
+    if (!enabled) return;
+
     let mounted = true;
 
     const setup = async () => {
@@ -81,7 +83,7 @@ export function useWebSocket() {
       mounted = false;
       disconnectSocket();
     };
-  }, []);
+  }, [enabled]);
 
   const emitGpsUpdate = async (data: GpsUpdate) => {
     const socket = await getSocket();

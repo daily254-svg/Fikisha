@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useAuthStore } from '@/store/auth.store';
 import { authService } from '@/services/auth.service';
+import { decodeJwtPayload } from '@/lib/jwt';
 import { LoginDto } from '@/types';
 
 export function useAuth() {
@@ -21,10 +22,10 @@ export function useAuth() {
   }, []);
 
   const login = async (dto: LoginDto) => {
-    const { accessToken } = await authService.login(dto);
+    const { data } = await authService.login(dto);
+    const { accessToken } = data;
 
-    const base64 = accessToken.split('.')[1];
-    const payload = JSON.parse(atob(base64));
+    const payload = decodeJwtPayload(accessToken);
 
     const isFirst = dto.password === dto.phone;
 

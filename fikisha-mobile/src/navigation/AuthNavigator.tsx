@@ -8,21 +8,17 @@ import { ChangePasswordScreen } from '../screens/auth/ChangePasswordScreen';
 interface AuthNavigationProps {
   screen: string;
   userPhone: string;
-  role: 'parent' | 'driver';
   onNavigate: (screen: string) => void;
-  onLogin: (role: 'parent' | 'driver', phone: string, password: string) => void;
+  onLogin: (phone: string, password: string) => Promise<void>;
   onPasswordChanged: () => void;
-  onResetSent: () => void;
 }
 
 export function AuthNavigation({
   screen,
   userPhone,
-  role,
   onNavigate,
   onLogin,
   onPasswordChanged,
-  onResetSent,
 }: AuthNavigationProps) {
   return (
     <View style={styles.container}>
@@ -36,10 +32,7 @@ export function AuthNavigation({
         />
       )}
       {screen === 'forgot-password' && (
-        <ForgotPasswordScreen
-          onBack={() => onNavigate('login')}
-          onResetSent={onResetSent}
-        />
+        <ForgotPasswordScreen onBack={() => onNavigate('login')} />
       )}
       {screen === 'change-password' && (
         <ChangePasswordScreen

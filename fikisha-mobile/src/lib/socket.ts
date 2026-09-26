@@ -24,7 +24,7 @@ export async function connectSocket(): Promise<void> {
 }
 
 export function disconnectSocket(): void {
-  if (socket?.connected) {
+  if (socket) {
     socket.disconnect();
     socket = null;
   }
