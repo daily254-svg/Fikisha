@@ -48,7 +48,7 @@ export function LiveTrackingScreen({ onBack }: LiveTrackingScreenProps) {
   const [busRegistration, setBusRegistration] = useState<string | null>(null);
   const [school, setSchool] = useState<School | null>(null);
 
-  const { liveLocation, dbLocation, isLive } = useTracking(busId);
+  const { liveLocation, dbLocation, isLive, routeActive } = useTracking(busId);
 
   const load = async () => {
     try {
@@ -129,8 +129,15 @@ export function LiveTrackingScreen({ onBack }: LiveTrackingScreenProps) {
               <ArrowLeft size={20} color="#1B365D" />
             </TouchableOpacity>
             <View style={styles.liveBadge}>
-              <View style={[styles.liveDot, { backgroundColor: isLive ? '#22C55E' : '#CBD5E1' }]} />
-              <Text style={styles.liveBadgeText}>{isLive ? 'LIVE TRACKING' : 'LAST KNOWN LOCATION'}</Text>
+              <View
+                style={[
+                  styles.liveDot,
+                  { backgroundColor: isLive ? '#22C55E' : routeActive ? '#F5C542' : '#CBD5E1' },
+                ]}
+              />
+              <Text style={styles.liveBadgeText}>
+                {isLive ? 'LIVE TRACKING' : routeActive ? 'ROUTE STARTED' : 'LAST KNOWN LOCATION'}
+              </Text>
             </View>
             <TouchableOpacity onPress={load} style={styles.topBarButton} activeOpacity={0.8}>
               <RefreshCw size={18} color="#1B365D" />

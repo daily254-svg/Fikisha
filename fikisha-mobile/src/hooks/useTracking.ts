@@ -4,11 +4,12 @@ import { useEffect, useState } from 'react';
 import { BusLocationResponse, GpsUpdate } from '@/types';
 
 export function useTracking(busId: string | null) {
-  const { busLocations } = useTrackingStore();
+  const { busLocations, activeRouteBuses } = useTrackingStore();
   const [dbLocation, setDbLocation] = useState<BusLocationResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   const liveLocation: GpsUpdate | null = busId ? busLocations[busId] ?? null : null;
+  const routeActive = busId ? !!activeRouteBuses[busId] : false;
 
   useEffect(() => {
     if (!busId || liveLocation) return;
@@ -25,6 +26,7 @@ export function useTracking(busId: string | null) {
     liveLocation,
     dbLocation,
     isLive: !!liveLocation,
+    routeActive,
     isLoading,
   };
 }

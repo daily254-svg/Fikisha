@@ -14,7 +14,7 @@ import { GpsUpdate, TransportEvent } from '@/types';
  * since calling it again would re-run this listener setup.
  */
 export function useWebSocket(enabled: boolean = true) {
-  const { updateBusLocation, clearBusLocation } = useTrackingStore();
+  const { updateBusLocation, clearBusLocation, setRouteActive } = useTrackingStore();
   const { prependNotification } = useNotificationsStore();
   const { prependEvent } = useEventsStore();
   const { show: showBanner } = useBannerStore();
@@ -36,6 +36,8 @@ export function useWebSocket(enabled: boolean = true) {
       };
 
       const handleRouteStarted = (payload: any) => {
+        if (payload?.busId) setRouteActive(payload.busId, true);
+
         const busLabel = payload?.busRegistration ?? 'The bus';
         const routeLabel = payload?.routeName ? ` on ${payload.routeName}` : '';
         const message = `${busLabel} is now on route${routeLabel}.`;
@@ -49,7 +51,10 @@ export function useWebSocket(enabled: boolean = true) {
       };
 
       const handleRouteEnded = (payload: { busId: string }) => {
-        if (payload?.busId) clearBusLocation(payload.busId);
+        if (payload?.busId) {
+          clearBusLocation(payload.busId);
+          setRouteActive(payload.busId, false);
+        }
         prependNotification({
           type: 'BUS_APPROACHING',
           title: 'Route ended',

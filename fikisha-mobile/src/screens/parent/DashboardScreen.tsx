@@ -63,7 +63,7 @@ export function ParentDashboard({ onNavigate }: ParentDashboardProps) {
   const [busRegistration, setBusRegistration] = useState<string | null>(null);
   const [school, setSchool] = useState<School | null>(null);
 
-  const { liveLocation, dbLocation, isLive } = useTracking(busId);
+  const { liveLocation, dbLocation, isLive, routeActive } = useTracking(busId);
   const { recentEvents, setEvents } = useEventsStore();
 
   useEffect(() => {
@@ -137,10 +137,12 @@ export function ParentDashboard({ onNavigate }: ParentDashboardProps) {
         bg: '#F0FDF4',
         Icon: CheckCircle2,
       }
-    : isLive
+    : isLive || routeActive
       ? {
           label: 'On the way',
-          sub: `${busRegistration ?? 'Bus'} · ${liveLocation ? `${Math.round(liveLocation.speed)} km/h` : 'Live'}`,
+          sub: isLive
+            ? `${busRegistration ?? 'Bus'} · ${liveLocation ? `${Math.round(liveLocation.speed)} km/h` : 'Live'}`
+            : `${busRegistration ?? 'Bus'} · Waiting for live location…`,
           color: '#1B365D',
           bg: '#FFF8E1',
           Icon: Navigation,
