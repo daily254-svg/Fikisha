@@ -10,9 +10,40 @@ import { UpdateRouteDto } from './dto/update-route.dto';
 import { CreateStopDto } from './dto/create-stop.dto';
 import { AssignStudentDto } from './dto/assign-student.dto';
 
+export interface GeocodeResult {
+  display_name: string;
+  lat: string;
+  lon: string;
+}
+
 @Injectable()
 export class RoutesService {
   constructor(private readonly prisma: PrismaService) {}
+
+  async geocode(query?: string): Promise<GeocodeResult[]> {
+    if (!query || query.trim().length < 3) return [];
+
+    const url = `https://nominatim.openstreetmap.org/search?format=json&countrycodes=ke&limit=5&q=${encodeURIComponent(query)}`;
+
+    const res = await fetch(url, {
+      headers: {
+        // Nominatim's usage policy requires a User-Agent that identifies the
+        // calling application — browsers won't let client JS set this header,
+        // so the lookup is proxied through here instead of called from the
+        // admin dashboard directly.
+        'User-Agent': 'Fikisha-School-Transport/1.0 (+https://github.com/daily254-svg/Fikisha)',
+      },
+    });
+
+    if (!res.ok) {
+      throw new BadRequestException('Address search is temporarily unavailable');
+    }
+
+    const data = (await res.json()) as GeocodeResult[];
+    return Array.isArray(data)
+      ? data.map((r) => ({ display_name: r.display_name, lat: r.lat, lon: r.lon }))
+      : [];
+  }
 
   async create(schoolId: string, dto: CreateRouteDto) {
     const route = await this.prisma.$transaction(async (tx) => {

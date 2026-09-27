@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { RoutesService } from './routes.service';
@@ -37,6 +38,11 @@ export class RoutesController {
   @Get()
   findAll(@CurrentUser() user: JwtPayload) {
     return this.routesService.findAll(user.schoolId);
+  }
+
+  @Get('geocode')
+  geocode(@Query('q') q?: string) {
+    return this.routesService.geocode(q);
   }
 
   @Get(':routeId')

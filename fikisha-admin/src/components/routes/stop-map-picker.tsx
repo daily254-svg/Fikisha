@@ -6,6 +6,8 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { Search, X } from 'lucide-react'
 import { Input } from '@/components/ui/input'
+import { routesService } from '@/services/routes.service'
+import type { GeocodeResult } from '@/types'
 
 // This module is only ever loaded client-side via next/dynamic({ ssr: false }),
 // same as components/tracking/live-map.tsx, so touching `window` here is safe.
@@ -21,12 +23,6 @@ const referenceIcon = L.divIcon({
   iconSize: [8, 8],
   iconAnchor: [4, 4],
 })
-
-interface GeocodeResult {
-  display_name: string
-  lat: string
-  lon: string
-}
 
 interface FlyTarget {
   lat: number
@@ -93,10 +89,7 @@ export function StopMapPicker({
     debounceRef.current = setTimeout(async () => {
       setSearching(true)
       try {
-        const res = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&countrycodes=ke&limit=5&q=${encodeURIComponent(value)}`,
-        )
-        const data = await res.json()
+        const data = await routesService.geocode(value)
         setResults(Array.isArray(data) ? data : [])
       } catch {
         setResults([])

@@ -6,10 +6,13 @@ import {
   CreateStopDto,
   AssignStudentDto,
   RouteStop,
+  GeocodeResult,
 } from '@/types'
 
 export const routesService = {
   findAll: () => get<Route[]>('/routes'),
+
+  geocode: (q: string) => get<GeocodeResult[]>('/routes/geocode', { params: { q } }),
 
   findById: (routeId: string) => get<Route>(`/routes/${routeId}`),
 

@@ -62,3 +62,9 @@ export interface AssignStudentDto {
   pickupStopId?: string
   dropoffStopId?: string
 }
+
+export interface GeocodeResult {
+  display_name: string
+  lat: string
+  lon: string
+}
