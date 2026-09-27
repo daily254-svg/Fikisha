@@ -57,7 +57,7 @@ export function DriverPickupScreen({ onBack, onNavigate }: DriverPickupScreenPro
         setActiveBus(busRes.data ?? null);
         setRouteStudents(studentsRes.data ?? []);
 
-        if (busRes.data) {
+        if (busRes.data?.bus?.id) {
           const today = new Date().toISOString().slice(0, 10);
           const eventsRes = await trackingService.getTransportEvents({
             busId: busRes.data.bus.id,
@@ -70,8 +70,8 @@ export function DriverPickupScreen({ onBack, onNavigate }: DriverPickupScreenPro
           }
           setStatuses(initial);
         }
-      } catch (e) {
-        console.error('Failed to load pickup list', e);
+      } catch (e: any) {
+        console.error('Failed to load pickup list:', e?.response?.data ?? e?.message ?? e);
       } finally {
         setIsLoading(false);
       }

@@ -56,7 +56,7 @@ export function DriverRouteScreen({ onBack, onNavigate }: DriverRouteScreenProps
       setRouteActive(!!busRes.data?.activeTrip);
       setRouteStudents(studentsRes.data ?? []);
 
-      if (busRes.data) {
+      if (busRes.data?.bus?.id) {
         const today = new Date().toISOString().slice(0, 10);
         const eventsRes = await trackingService.getTransportEvents({
           busId: busRes.data.bus.id,
@@ -65,8 +65,8 @@ export function DriverRouteScreen({ onBack, onNavigate }: DriverRouteScreenProps
         });
         setPickedUpIds(new Set((eventsRes.data ?? []).map((e: TransportEvent) => e.studentId)));
       }
-    } catch (e) {
-      console.error('Failed to load route', e);
+    } catch (e: any) {
+      console.error('Failed to load route:', e?.response?.data ?? e?.message ?? e);
     } finally {
       setIsLoading(false);
     }
