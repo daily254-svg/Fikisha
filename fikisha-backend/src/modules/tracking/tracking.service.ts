@@ -137,7 +137,13 @@ export class TrackingService {
       JSON.stringify(stops),
     );
 
-    return { busId: payload.busId, routeId: payload.routeId, tripId: trip.id };
+    return {
+      busId: payload.busId,
+      routeId: payload.routeId,
+      tripId: trip.id,
+      routeName: route.name,
+      busRegistration: bus.registrationNumber,
+    };
   }
 
   async getLocationHistory(schoolId: string, busId: string, limit: number = 50) {
@@ -186,7 +192,7 @@ export class TrackingService {
 
     await this.notificationsService.sendPickupNotification(payload.studentId);
 
-    return event;
+    return { ...event, student };
   }
 
   async handleStudentDropoff(schoolId: string, payload: StudentEventPayload) {
@@ -219,7 +225,7 @@ export class TrackingService {
 
     await this.notificationsService.sendDropoffNotification(payload.studentId);
 
-    return event;
+    return { ...event, student };
   }
 
   async handleStudentAbsent(schoolId: string, payload: StudentEventPayload) {
@@ -252,7 +258,7 @@ export class TrackingService {
 
     await this.notificationsService.sendAbsentNotification(payload.studentId);
 
-    return event;
+    return { ...event, student };
   }
 
   async handleRouteEnd(_schoolId: string, busId: string): Promise<void> {

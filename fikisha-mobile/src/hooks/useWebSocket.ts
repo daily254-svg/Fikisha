@@ -1,6 +1,8 @@
 import { useEffect } from 'react';
 import { useTrackingStore } from '@/store/tracking.store';
 import { useNotificationsStore } from '@/store/notifications.store';
+import { useEventsStore } from '@/store/events.store';
+import { useBannerStore } from '@/store/banner.store';
 import { connectSocket, disconnectSocket, getSocket } from '@/lib/socket';
 import { GpsUpdate, TransportEvent } from '@/types';
 
@@ -14,6 +16,8 @@ import { GpsUpdate, TransportEvent } from '@/types';
 export function useWebSocket(enabled: boolean = true) {
   const { updateBusLocation, clearBusLocation } = useTrackingStore();
   const { prependNotification } = useNotificationsStore();
+  const { prependEvent } = useEventsStore();
+  const { show: showBanner } = useBannerStore();
 
   useEffect(() => {
     if (!enabled) return;
@@ -32,11 +36,16 @@ export function useWebSocket(enabled: boolean = true) {
       };
 
       const handleRouteStarted = (payload: any) => {
+        const busLabel = payload?.busRegistration ?? 'The bus';
+        const routeLabel = payload?.routeName ? ` on ${payload.routeName}` : '';
+        const message = `${busLabel} is now on route${routeLabel}.`;
+
         prependNotification({
           type: 'BUS_APPROACHING',
           title: 'Route started',
-          message: `Route ${payload?.route?.name ?? payload?.routeId ?? ''} is now active.`,
+          message,
         });
+        showBanner({ title: 'Driver is on the way', message, tone: 'info' });
       };
 
       const handleRouteEnded = (payload: { busId: string }) => {
@@ -46,36 +55,34 @@ export function useWebSocket(enabled: boolean = true) {
           title: 'Route ended',
           message: 'The route has ended.',
         });
+        showBanner({ title: 'Route ended', message: 'The bus has finished its route.', tone: 'info' });
       };
 
       const handleStudentPickup = (payload: TransportEvent) => {
-        prependNotification({
-          type: 'PICKED_UP',
-          title: 'Student picked up',
-          message: payload?.student
-            ? `${payload.student.firstName} was picked up`
-            : 'A student was picked up.',
-        });
+        prependEvent(payload);
+        const message = payload?.student
+          ? `${payload.student.firstName} was picked up`
+          : 'A student was picked up.';
+        prependNotification({ type: 'PICKED_UP', title: 'Student picked up', message });
+        showBanner({ title: 'Picked up', message, tone: 'success' });
       };
 
       const handleStudentDropoff = (payload: TransportEvent) => {
-        prependNotification({
-          type: 'DROPPED_OFF',
-          title: 'Student dropped off',
-          message: payload?.student
-            ? `${payload.student.firstName} was dropped off`
-            : 'A student was dropped off.',
-        });
+        prependEvent(payload);
+        const message = payload?.student
+          ? `${payload.student.firstName} was dropped off`
+          : 'A student was dropped off.';
+        prependNotification({ type: 'DROPPED_OFF', title: 'Student dropped off', message });
+        showBanner({ title: 'Dropped off', message, tone: 'success' });
       };
 
       const handleStudentAbsent = (payload: TransportEvent) => {
-        prependNotification({
-          type: 'ABSENT',
-          title: 'Student marked absent',
-          message: payload?.student
-            ? `${payload.student.firstName} was marked absent`
-            : 'A student was marked absent.',
-        });
+        prependEvent(payload);
+        const message = payload?.student
+          ? `${payload.student.firstName} was marked absent`
+          : 'A student was marked absent.';
+        prependNotification({ type: 'ABSENT', title: 'Student marked absent', message });
+        showBanner({ title: 'Marked absent', message, tone: 'warning' });
       };
 
       const handleConnect = () => console.log('[Socket] Connected');

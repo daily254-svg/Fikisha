@@ -4,6 +4,7 @@ import { RootNavigation } from './src/navigation/RootNavigator';
 import { useAuth } from './src/hooks/useAuth';
 import { useAuthStore } from './src/store/auth.store';
 import { useWebSocket } from './src/hooks/useWebSocket';
+import { InAppBanner } from './src/components/InAppBanner';
 import { SCHOOL_ID } from './src/constants/api';
 import type { Screen } from './src/navigation/types';
 import type { UserRole } from './src/types';
@@ -79,6 +80,7 @@ export default function App() {
         onPasswordChanged={handlePasswordChanged}
         onLogout={handleLogout}
       />
+      <InAppBanner />
     </SafeAreaProvider>
   );
 }

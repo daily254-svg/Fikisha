@@ -14,6 +14,7 @@ import { parentsService } from '@/services/parents.service';
 import { schoolsService, School } from '@/services/schools.service';
 import { useTracking } from '@/hooks/useTracking';
 import { useAuthStore } from '@/store/auth.store';
+import { useEventsStore } from '@/store/events.store';
 import { trackingService } from '@/services/tracking.service';
 import {
   Bell,
@@ -60,10 +61,10 @@ export function ParentDashboard({ onNavigate }: ParentDashboardProps) {
   const [selectedChild, setSelectedChild] = useState<Student | null>(null);
   const [busId, setBusId] = useState<string | null>(null);
   const [busRegistration, setBusRegistration] = useState<string | null>(null);
-  const [recentEvents, setRecentEvents] = useState<TransportEvent[]>([]);
   const [school, setSchool] = useState<School | null>(null);
 
   const { liveLocation, dbLocation, isLive } = useTracking(busId);
+  const { recentEvents, setEvents } = useEventsStore();
 
   useEffect(() => {
     let mounted = true;
@@ -78,7 +79,7 @@ export function ParentDashboard({ onNavigate }: ParentDashboardProps) {
         if (!mounted) return;
 
         setParentName(profileRes.data.user?.name || '');
-        setRecentEvents(eventsRes.data);
+        setEvents(eventsRes.data);
 
         const first = studentsRes.data[0]?.student ?? null;
         setSelectedChild(first);
