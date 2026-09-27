@@ -16,6 +16,7 @@ import {
   User2,
   MapPin,
   Search,
+  AlertTriangle,
 } from 'lucide-react-native';
 import { driversService } from '@/services/drivers.service';
 import { trackingService } from '@/services/tracking.service';
@@ -25,6 +26,7 @@ import type { ActiveBusAssignment, RouteStudents, TransportEvent } from '@/types
 
 interface DriverPickupScreenProps {
   onBack: () => void;
+  onNavigate: (screen: string) => void;
 }
 
 type Status = 'picked' | 'pending' | 'absent';
@@ -35,7 +37,7 @@ const statusColors: Record<Status, { bg: string; text: string; label: string }> 
   absent: { bg: '#FEF2F2', text: '#EF4444', label: 'Absent' },
 };
 
-export function DriverPickupScreen({ onBack }: DriverPickupScreenProps) {
+export function DriverPickupScreen({ onBack, onNavigate }: DriverPickupScreenProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [activeBus, setActiveBus] = useState<ActiveBusAssignment | null>(null);
   const [routeStudents, setRouteStudents] = useState<RouteStudents[]>([]);
@@ -77,6 +79,7 @@ export function DriverPickupScreen({ onBack }: DriverPickupScreenProps) {
 
   const route = routeStudents[0]?.route;
   const students = routeStudents[0]?.students ?? [];
+  const routeActive = !!activeBus?.activeTrip;
   const stopNameById = useMemo(() => {
     const map = new Map<string, string>();
     (route?.stops ?? []).forEach((s) => map.set(s.id, s.name));
@@ -86,6 +89,7 @@ export function DriverPickupScreen({ onBack }: DriverPickupScreenProps) {
   const statusOf = (studentId: string): Status => statuses[studentId] ?? 'pending';
 
   const setStatus = async (studentId: string, status: Status) => {
+    if (!routeActive) return;
     setStatuses((prev) => ({ ...prev, [studentId]: status }));
     if (!activeBus) return;
     const lat = location.latitude ?? undefined;
@@ -168,6 +172,22 @@ export function DriverPickupScreen({ onBack }: DriverPickupScreenProps) {
         </View>
       </View>
 
+      {!routeActive && (
+        <View style={styles.notStartedBanner}>
+          <AlertTriangle size={16} color="#F97316" />
+          <Text style={styles.notStartedText}>
+            Start your route before marking pickups.
+          </Text>
+          <TouchableOpacity
+            onPress={() => onNavigate('driver-route')}
+            style={styles.notStartedButton}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.notStartedButtonText}>Go to Route</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       <View style={styles.searchContainer}>
         <View style={styles.searchBar}>
           <Search size={16} color="#6B7FA3" />
@@ -235,7 +255,8 @@ export function DriverPickupScreen({ onBack }: DriverPickupScreenProps) {
                 <View style={styles.actionRow}>
                   <TouchableOpacity
                     onPress={() => setStatus(student.id, 'picked')}
-                    style={styles.pickupButton}
+                    disabled={!routeActive}
+                    style={[styles.pickupButton, !routeActive && styles.actionButtonDisabled]}
                     activeOpacity={0.8}
                   >
                     <CheckCircle2 size={18} color="#ffffff" />
@@ -243,7 +264,8 @@ export function DriverPickupScreen({ onBack }: DriverPickupScreenProps) {
                   </TouchableOpacity>
                   <TouchableOpacity
                     onPress={() => setStatus(student.id, 'absent')}
-                    style={styles.absentButton}
+                    disabled={!routeActive}
+                    style={[styles.absentButton, !routeActive && styles.actionButtonDisabled]}
                     activeOpacity={0.8}
                   >
                     <XCircle size={18} color="#EF4444" />
@@ -315,6 +337,36 @@ const styles = StyleSheet.create({
   },
   statLabel: {
     fontSize: 10,
+  },
+  notStartedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    backgroundColor: '#FFF7ED',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(249,115,22,0.15)',
+  },
+  notStartedText: {
+    flex: 1,
+    color: '#9A3412',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  notStartedButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+    backgroundColor: '#F97316',
+  },
+  notStartedButtonText: {
+    color: '#ffffff',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  actionButtonDisabled: {
+    opacity: 0.4,
   },
   searchContainer: {
     backgroundColor: '#ffffff',

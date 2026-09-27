@@ -30,7 +30,10 @@ export function DriverNavigation({
         />
       )}
       {screen === 'driver-pickup' && (
-        <DriverPickupScreen onBack={() => onNavigate('driver-home')} />
+        <DriverPickupScreen
+          onBack={() => onNavigate('driver-home')}
+          onNavigate={onNavigate}
+        />
       )}
       {screen === 'driver-incident' && (
         <DriverIncidentScreen onBack={() => onNavigate('driver-home')} />

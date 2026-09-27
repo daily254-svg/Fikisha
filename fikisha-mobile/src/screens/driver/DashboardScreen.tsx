@@ -13,6 +13,7 @@ import {
   MapPin,
   Users,
   Play,
+  Navigation,
   ChevronRight,
   Bus,
   AlertTriangle,
@@ -89,6 +90,7 @@ export function DriverDashboard({ onNavigate }: DriverDashboardProps) {
   const driverName = driver?.user?.name || 'Driver';
   const bus = activeBus?.bus;
   const route = bus?.routes?.[0];
+  const routeActive = !!activeBus?.activeTrip;
   const totalStudents = routeStudents.reduce((sum, r) => sum + r.students.length, 0);
   const pendingToday = Math.max(totalStudents - pickedUpToday - absentToday, 0);
   const pickupPercent = totalStudents > 0 ? Math.round((pickedUpToday / totalStudents) * 100) : 0;
@@ -176,9 +178,16 @@ export function DriverDashboard({ onNavigate }: DriverDashboardProps) {
                   </Text>
                   <Text style={styles.routeName}>{route.name}</Text>
                 </View>
-                <View style={styles.routeIcon}>
-                  <MapPin size={20} color="#F5C542" />
-                </View>
+                {routeActive ? (
+                  <View style={styles.routeActivePill}>
+                    <View style={styles.routeActiveDot} />
+                    <Text style={styles.routeActivePillText}>Active</Text>
+                  </View>
+                ) : (
+                  <View style={styles.routeIcon}>
+                    <MapPin size={20} color="#F5C542" />
+                  </View>
+                )}
               </View>
 
               <View style={styles.routeGrid}>
@@ -207,11 +216,17 @@ export function DriverDashboard({ onNavigate }: DriverDashboardProps) {
               <View style={styles.actionButtons}>
                 <TouchableOpacity
                   onPress={() => onNavigate('driver-route')}
-                  style={[styles.actionButton, styles.startButton]}
+                  style={[styles.actionButton, routeActive ? styles.continueButton : styles.startButton]}
                   activeOpacity={0.8}
                 >
-                  <Play size={20} color="#1B365D" fill="#1B365D" />
-                  <Text style={styles.startButtonText}>Start Route</Text>
+                  {routeActive ? (
+                    <Navigation size={20} color="#ffffff" />
+                  ) : (
+                    <Play size={20} color="#1B365D" fill="#1B365D" />
+                  )}
+                  <Text style={routeActive ? styles.continueButtonText : styles.startButtonText}>
+                    {routeActive ? 'Continue Route' : 'Start Route'}
+                  </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   onPress={() => onNavigate('driver-pickup')}
@@ -428,6 +443,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  routeActivePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#F0FDF4',
+  },
+  routeActiveDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: '#22C55E',
+  },
+  routeActivePillText: {
+    color: '#22C55E',
+    fontSize: 12,
+    fontWeight: '700',
+  },
   routeGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -484,6 +519,19 @@ const styles = StyleSheet.create({
   },
   startButtonText: {
     color: '#1B365D',
+    fontWeight: '700',
+    fontSize: 15,
+  },
+  continueButton: {
+    backgroundColor: '#22C55E',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  continueButtonText: {
+    color: '#ffffff',
     fontWeight: '700',
     fontSize: 15,
   },

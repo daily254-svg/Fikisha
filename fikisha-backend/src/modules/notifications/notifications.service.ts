@@ -207,6 +207,56 @@ export class NotificationsService {
     );
   }
 
+  /** Notifies parents of every student on this specific route that the bus has started. */
+  async sendRouteStartedNotification(data: {
+    schoolId: string;
+    busId: string;
+    routeId: string;
+    busRegistration: string;
+    routeName: string;
+  }) {
+    const studentRoutes = await this.prisma.studentRoute.findMany({
+      where: { schoolId: data.schoolId, routeId: data.routeId, active: true },
+      include: {
+        student: {
+          include: {
+            parents: { include: { parent: { include: { user: true } } } },
+          },
+        },
+      },
+    });
+
+    const userMap = new Map<string, { id: string; fcmToken: string | null }>();
+    for (const sr of studentRoutes) {
+      for (const ps of sr.student.parents) {
+        userMap.set(ps.parent.user.id, {
+          id: ps.parent.user.id,
+          fcmToken: ps.parent.user.fcmToken,
+        });
+      }
+    }
+
+    if (userMap.size === 0) return;
+
+    const title = '🚌 Route started';
+    const message = `${data.busRegistration} is now on ${data.routeName}`;
+
+    const userIds = Array.from(userMap.keys());
+    await this.persistForUsers(data.schoolId, userIds, title, message, 'BUS_APPROACHING');
+
+    const fcmTokens = Array.from(userMap.values())
+      .map((u) => u.fcmToken)
+      .filter(Boolean) as string[];
+
+    if (fcmTokens.length === 0) return;
+
+    await this.firebaseService.sendToMultiple(
+      fcmTokens,
+      { title, body: message },
+      { type: 'BUS_APPROACHING', busId: data.busId, routeId: data.routeId },
+    );
+  }
+
   /** Notifies parents of every student on the bus's active routes, plus the school's admins. */
   async sendIncidentNotification(data: {
     schoolId: string;

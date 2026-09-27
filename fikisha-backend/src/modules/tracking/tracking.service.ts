@@ -137,6 +137,14 @@ export class TrackingService {
       JSON.stringify(stops),
     );
 
+    await this.notificationsService.sendRouteStartedNotification({
+      schoolId,
+      busId: payload.busId,
+      routeId: payload.routeId,
+      busRegistration: bus.registrationNumber,
+      routeName: route.name,
+    });
+
     return {
       busId: payload.busId,
       routeId: payload.routeId,
