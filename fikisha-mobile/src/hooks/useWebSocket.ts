@@ -32,10 +32,12 @@ export function useWebSocket(enabled: boolean = true) {
       if (!mounted) return;
 
       const handleBusUpdate = (data: GpsUpdate) => {
+        console.log(`[Socket] bus_location_update for busId=${data.busId}`);
         updateBusLocation(data.busId, data);
       };
 
       const handleRouteStarted = (payload: any) => {
+        console.log(`[Socket] route_started for busId=${payload?.busId}`, payload);
         if (payload?.busId) setRouteActive(payload.busId, true);
 
         const busLabel = payload?.busRegistration ?? 'The bus';

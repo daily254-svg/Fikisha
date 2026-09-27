@@ -87,11 +87,15 @@ export function ParentDashboard({ onNavigate }: ParentDashboardProps) {
         if (first) {
           const routeBus = first.routes?.[0]?.route?.bus;
           if (routeBus) {
+            console.log(`[ParentDashboard] busId from route = ${routeBus.id} (${routeBus.registrationNumber})`);
             setBusId(routeBus.id);
             setBusRegistration(routeBus.registrationNumber);
           } else {
             const busRes = await parentsService.getStudentBus(first.id);
             if (!mounted) return;
+            console.log(
+              `[ParentDashboard] busId from getStudentBus = ${busRes.data.bus?.id} (${busRes.data.bus?.registrationNumber})`,
+            );
             setBusId(busRes.data.bus?.id ?? null);
             setBusRegistration(busRes.data.bus?.registrationNumber ?? null);
           }
