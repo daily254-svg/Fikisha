@@ -236,7 +236,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   mapContainer: {
-    ...StyleSheet.absoluteFillObject,
+    flex: 1,
   },
   topOverlay: {
     position: 'absolute',
