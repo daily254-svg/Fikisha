@@ -13,6 +13,8 @@ export const ENDPOINTS = {
     students: '/parents/me/students',
     studentBus: (studentId: string) =>
       `/parents/me/students/${studentId}/bus`,
+    routes: '/parents/routes',
+    selectRoute: (studentId: string) => `/parents/me/students/${studentId}/route`,
   },
   drivers: {
     me: '/drivers/me',

@@ -8,7 +8,7 @@ import { DriverBottomNav } from './DriverBottomNav';
 import type { Screen } from './types';
 
 const AUTH_SCREENS: Screen[] = ['splash', 'login', 'forgot-password', 'change-password'];
-const PARENT_SCREENS: Screen[] = ['home', 'tracking', 'notifications', 'history', 'profile'];
+const PARENT_SCREENS: Screen[] = ['home', 'tracking', 'notifications', 'history', 'profile', 'select-stop'];
 const DRIVER_SCREENS: Screen[] = [
   'driver-home',
   'driver-route',

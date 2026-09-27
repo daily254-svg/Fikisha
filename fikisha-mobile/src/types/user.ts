@@ -38,6 +38,20 @@ export interface RouteInfo {
   stops?: RouteStop[];
 }
 
+export interface ParentRoute {
+  id: string;
+  name: string;
+  direction: 'MORNING' | 'EVENING';
+  bus?: { id: string; registrationNumber: string } | null;
+  stops: RouteStop[];
+}
+
+export interface SelectRouteDto {
+  routeId: string;
+  pickupStopId?: string;
+  dropoffStopId?: string;
+}
+
 export interface DriverProfile {
   id: string;
   licenseNo?: string | null;

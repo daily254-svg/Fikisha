@@ -8,6 +8,7 @@ export type Screen =
   | 'notifications'
   | 'history'
   | 'profile'
+  | 'select-stop'
   | 'driver-home'
   | 'driver-route'
   | 'driver-pickup'

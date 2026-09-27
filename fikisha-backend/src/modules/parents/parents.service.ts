@@ -1,6 +1,13 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RedisService } from '../../redis/redis.service';
+import type { JwtPayload } from '../auth/strategies/jwt.strategy';
+import { SelectRouteDto } from './dto/select-route.dto';
 
 @Injectable()
 export class ParentsService {
@@ -130,6 +137,89 @@ export class ParentsService {
         : null,
       isLive: false,
     };
+  }
+
+  async getRoutes(schoolId: string) {
+    return this.prisma.route.findMany({
+      where: { schoolId },
+      include: {
+        stops: { orderBy: { sequence: 'asc' } },
+        bus: { select: { id: true, registrationNumber: true } },
+      },
+      orderBy: { name: 'asc' },
+    });
+  }
+
+  async selectRoute(user: JwtPayload, studentId: string, dto: SelectRouteDto) {
+    const link = await this.prisma.parentStudent.findFirst({
+      where: { parent: { userId: user.sub }, studentId },
+    });
+
+    if (!link) {
+      throw new ForbiddenException('You are not linked to this student');
+    }
+
+    if (!dto.pickupStopId && !dto.dropoffStopId) {
+      throw new BadRequestException('Select at least a pickup or dropoff stop');
+    }
+
+    const route = await this.prisma.route.findUnique({
+      where: { id: dto.routeId },
+      include: { stops: true },
+    });
+
+    if (!route || route.schoolId !== user.schoolId) {
+      throw new NotFoundException(`Route with ID ${dto.routeId} not found`);
+    }
+
+    if (dto.pickupStopId && !route.stops.some((s) => s.id === dto.pickupStopId)) {
+      throw new BadRequestException('Pickup stop does not belong to this route');
+    }
+
+    if (dto.dropoffStopId && !route.stops.some((s) => s.id === dto.dropoffStopId)) {
+      throw new BadRequestException('Dropoff stop does not belong to this route');
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      // A student rides one route per direction (morning/evening) — picking a
+      // new route of the same direction replaces the old one instead of
+      // stacking alongside it.
+      const others = await tx.studentRoute.findMany({
+        where: { studentId, active: true, routeId: { not: dto.routeId } },
+        include: { route: { select: { direction: true } } },
+      });
+      const superseded = others.filter((o) => o.route.direction === route.direction);
+      if (superseded.length > 0) {
+        await tx.studentRoute.updateMany({
+          where: { id: { in: superseded.map((o) => o.id) } },
+          data: { active: false },
+        });
+      }
+
+      return tx.studentRoute.upsert({
+        where: { studentId_routeId: { studentId, routeId: dto.routeId } },
+        update: {
+          pickupStopId: dto.pickupStopId,
+          dropoffStopId: dto.dropoffStopId,
+          active: true,
+        },
+        create: {
+          schoolId: user.schoolId,
+          studentId,
+          routeId: dto.routeId,
+          pickupStopId: dto.pickupStopId,
+          dropoffStopId: dto.dropoffStopId,
+        },
+        include: {
+          route: {
+            include: {
+              stops: { orderBy: { sequence: 'asc' } },
+              bus: { select: { id: true, registrationNumber: true } },
+            },
+          },
+        },
+      });
+    });
   }
 
   private sanitizeUser(user: any) {

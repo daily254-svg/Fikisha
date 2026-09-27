@@ -5,6 +5,7 @@ import { LiveTrackingScreen } from '../screens/parent/LiveTrackingScreen';
 import { ParentNotificationsScreen } from '../screens/parent/NotificationsScreen';
 import { HistoryScreen } from '../screens/parent/HistoryScreen';
 import { ParentProfileScreen } from '../screens/parent/ProfileScreen';
+import { SelectStopScreen } from '../screens/parent/SelectStopScreen';
 
 interface ParentNavigationProps {
   screen: string;
@@ -36,6 +37,9 @@ export function ParentNavigation({
           onBack={() => onNavigate('home')}
           onLogout={onLogout}
         />
+      )}
+      {screen === 'select-stop' && (
+        <SelectStopScreen onBack={() => onNavigate('home')} />
       )}
     </View>
   );

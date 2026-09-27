@@ -24,6 +24,7 @@ import {
   Bus,
   User2,
   AlertCircle,
+  MapPin,
 } from 'lucide-react-native';
 import type { Student, TransportEvent } from '@/types';
 
@@ -207,6 +208,18 @@ export function ParentDashboard({ onNavigate }: ParentDashboardProps) {
                   </View>
                 </View>
 
+                <TouchableOpacity
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    onNavigate('select-stop');
+                  }}
+                  style={styles.changeStopRow}
+                  activeOpacity={0.7}
+                >
+                  <MapPin size={13} color="#6B7FA3" />
+                  <Text style={styles.changeStopText}>Change pickup / drop-off stop</Text>
+                </TouchableOpacity>
+
                 {/* Status steps */}
                 <View style={styles.statusSteps}>
                   {[
@@ -249,6 +262,16 @@ export function ParentDashboard({ onNavigate }: ParentDashboardProps) {
                     ? "Your child isn't assigned to a route yet."
                     : 'Contact your school to link a student to your account.'}
                 </Text>
+                {selectedChild && (
+                  <TouchableOpacity
+                    onPress={() => onNavigate('select-stop')}
+                    style={styles.chooseStopButton}
+                    activeOpacity={0.8}
+                  >
+                    <MapPin size={15} color="#1B365D" />
+                    <Text style={styles.chooseStopButtonText}>Choose a stop</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
           )}
@@ -422,6 +445,35 @@ const styles = StyleSheet.create({
     color: '#6B7FA3',
     fontSize: 13,
     lineHeight: 19,
+  },
+  chooseStopButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 14,
+    paddingVertical: 12,
+    borderRadius: 14,
+    backgroundColor: '#FFF8E1',
+  },
+  chooseStopButtonText: {
+    color: '#1B365D',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  changeStopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 14,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(27,54,93,0.06)',
+  },
+  changeStopText: {
+    color: '#6B7FA3',
+    fontSize: 12,
+    fontWeight: '600',
   },
   trackingInfo: {
     padding: 16,
