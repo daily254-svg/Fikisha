@@ -1,12 +1,18 @@
 'use client'
 
 import { useState } from 'react'
+import dynamic from 'next/dynamic'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Plus, Trash2, Pencil } from 'lucide-react'
+import { Plus, Trash2, Pencil, MapPin } from 'lucide-react'
 import { routesService } from '@/services/routes.service'
 import { busesService } from '@/services/buses.service'
 import { studentsService } from '@/services/students.service'
 import { CreateStopDto, Route } from '@/types'
+
+const StopMapPicker = dynamic(
+  () => import('@/components/routes/stop-map-picker').then((m) => m.StopMapPicker),
+  { ssr: false }
+)
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -129,10 +135,22 @@ function CreateRouteDialog({
   const [name, setName] = useState('')
   const [direction, setDirection] = useState<'MORNING' | 'EVENING'>('MORNING')
   const [busId, setBusId] = useState('')
-  const [stops, setStops] = useState<CreateStopDto[]>([
-    { name: '', latitude: 0, longitude: 0, sequence: 1, radiusMeters: 150 },
-  ])
+  const [stops, setStops] = useState<CreateStopDto[]>([])
+  const [draftName, setDraftName] = useState('')
+  const [draftLat, setDraftLat] = useState<number | null>(null)
+  const [draftLng, setDraftLng] = useState<number | null>(null)
   const [error, setError] = useState('')
+
+  const resetForm = () => {
+    setName('')
+    setDirection('MORNING')
+    setBusId('')
+    setStops([])
+    setDraftName('')
+    setDraftLat(null)
+    setDraftLng(null)
+    setError('')
+  }
 
   const create = useMutation({
     mutationFn: () =>
@@ -145,17 +163,20 @@ function CreateRouteDialog({
     onSuccess: () => {
       onCreated()
       onOpenChange(false)
-      setName('')
-      setDirection('MORNING')
-      setBusId('')
-      setStops([{ name: '', latitude: 0, longitude: 0, sequence: 1, radiusMeters: 150 }])
-      setError('')
+      resetForm()
     },
     onError: (err: any) => setError(err?.response?.data?.message ?? 'Failed to create route'),
   })
 
-  const updateStop = (index: number, patch: Partial<CreateStopDto>) => {
-    setStops((prev) => prev.map((s, i) => (i === index ? { ...s, ...patch } : s)))
+  const addDraftStop = () => {
+    if (!draftName || draftLat == null || draftLng == null) return
+    setStops((prev) => [
+      ...prev,
+      { name: draftName, latitude: draftLat, longitude: draftLng, sequence: prev.length + 1, radiusMeters: 150 },
+    ])
+    setDraftName('')
+    setDraftLat(null)
+    setDraftLng(null)
   }
 
   return (
@@ -196,71 +217,80 @@ function CreateRouteDialog({
             </div>
           </div>
 
-          <div>
-            <div className="mb-2 flex items-center justify-between">
-              <Label>Stops (in order)</Label>
+          <div className="flex flex-col gap-3">
+            <Label>Stops (in order)</Label>
+
+            {stops.length > 0 && (
+              <div className="flex flex-col gap-2">
+                {stops.map((stop, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center justify-between rounded-md border border-border px-3 py-2 text-sm"
+                  >
+                    <span className="flex items-center gap-2">
+                      <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
+                      {i + 1}. {stop.name}{' '}
+                      <span className="text-muted-foreground">
+                        ({stop.latitude.toFixed(4)}, {stop.longitude.toFixed(4)})
+                      </span>
+                    </span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => setStops((prev) => prev.filter((_, idx) => idx !== i))}
+                    >
+                      <Trash2 />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <StopMapPicker
+              latitude={draftLat}
+              longitude={draftLng}
+              onPick={(lat, lng) => {
+                setDraftLat(lat)
+                setDraftLng(lng)
+              }}
+              otherStops={stops.map((s, i) => ({
+                id: String(i),
+                name: s.name,
+                latitude: s.latitude,
+                longitude: s.longitude,
+              }))}
+            />
+
+            <div className="flex items-end gap-2">
+              <div className="flex flex-1 flex-col gap-1.5">
+                <Input
+                  placeholder="Stop name"
+                  value={draftName}
+                  onChange={(e) => setDraftName(e.target.value)}
+                />
+              </div>
               <Button
                 type="button"
                 size="sm"
-                variant="outline"
-                onClick={() =>
-                  setStops((prev) => [
-                    ...prev,
-                    { name: '', latitude: 0, longitude: 0, sequence: prev.length + 1, radiusMeters: 150 },
-                  ])
-                }
+                disabled={!draftName || draftLat == null || draftLng == null}
+                onClick={addDraftStop}
               >
                 <Plus />
                 Add stop
               </Button>
             </div>
-            <div className="flex flex-col gap-2">
-              {stops.map((stop, i) => (
-                <div key={i} className="grid grid-cols-[1fr_auto_auto_auto] items-end gap-2">
-                  <Input
-                    placeholder={`Stop ${i + 1} name`}
-                    value={stop.name}
-                    onChange={(e) => updateStop(i, { name: e.target.value })}
-                    required
-                  />
-                  <Input
-                    className="w-24"
-                    type="number"
-                    step="any"
-                    placeholder="Lat"
-                    value={stop.latitude || ''}
-                    onChange={(e) => updateStop(i, { latitude: parseFloat(e.target.value) })}
-                    required
-                  />
-                  <Input
-                    className="w-24"
-                    type="number"
-                    step="any"
-                    placeholder="Lng"
-                    value={stop.longitude || ''}
-                    onChange={(e) => updateStop(i, { longitude: parseFloat(e.target.value) })}
-                    required
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-sm"
-                    disabled={stops.length === 1}
-                    onClick={() => setStops((prev) => prev.filter((_, idx) => idx !== i))}
-                  >
-                    <Trash2 />
-                  </Button>
-                </div>
-              ))}
-            </div>
           </div>
 
+          {stops.length === 0 && (
+            <p className="text-xs text-muted-foreground">Add at least one stop before saving.</p>
+          )}
           {error && <p className="text-sm text-destructive">{error}</p>}
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={create.isPending}>
+            <Button type="submit" disabled={create.isPending || stops.length === 0}>
               {create.isPending ? 'Adding…' : 'Add route'}
             </Button>
           </DialogFooter>
@@ -289,8 +319,8 @@ function ManageRouteDialog({
   const { data: students } = useQuery({ queryKey: ['students'], queryFn: studentsService.findAll })
 
   const [newStopName, setNewStopName] = useState('')
-  const [newStopLat, setNewStopLat] = useState('')
-  const [newStopLng, setNewStopLng] = useState('')
+  const [newStopLat, setNewStopLat] = useState<number | null>(null)
+  const [newStopLng, setNewStopLng] = useState<number | null>(null)
   const [selectedStudentId, setSelectedStudentId] = useState('')
   const [pickupStopId, setPickupStopId] = useState('')
   const [error, setError] = useState('')
@@ -304,15 +334,15 @@ function ManageRouteDialog({
     mutationFn: () =>
       routesService.addStop(routeId, {
         name: newStopName,
-        latitude: parseFloat(newStopLat),
-        longitude: parseFloat(newStopLng),
+        latitude: newStopLat as number,
+        longitude: newStopLng as number,
         sequence: (route?.stops?.length ?? 0) + 1,
       }),
     onSuccess: () => {
       refresh()
       setNewStopName('')
-      setNewStopLat('')
-      setNewStopLng('')
+      setNewStopLat(null)
+      setNewStopLng(null)
     },
     onError: (err: any) => setError(err?.response?.data?.message ?? 'Failed to add stop'),
   })
@@ -375,18 +405,34 @@ function ManageRouteDialog({
                 </div>
               ))}
             </div>
-            <div className="mt-2 grid grid-cols-[1fr_auto_auto_auto] items-end gap-2">
-              <Input placeholder="Stop name" value={newStopName} onChange={(e) => setNewStopName(e.target.value)} />
-              <Input className="w-24" type="number" step="any" placeholder="Lat" value={newStopLat} onChange={(e) => setNewStopLat(e.target.value)} />
-              <Input className="w-24" type="number" step="any" placeholder="Lng" value={newStopLng} onChange={(e) => setNewStopLng(e.target.value)} />
-              <Button
-                type="button"
-                size="sm"
-                disabled={!newStopName || !newStopLat || !newStopLng || addStop.isPending}
-                onClick={() => addStop.mutate()}
-              >
-                Add
-              </Button>
+            <div className="mt-2 flex flex-col gap-2">
+              <StopMapPicker
+                latitude={newStopLat}
+                longitude={newStopLng}
+                onPick={(lat, lng) => {
+                  setNewStopLat(lat)
+                  setNewStopLng(lng)
+                }}
+                otherStops={route.stops ?? []}
+                height={220}
+              />
+              <div className="flex items-end gap-2">
+                <div className="flex flex-1 flex-col gap-1.5">
+                  <Input
+                    placeholder="Stop name"
+                    value={newStopName}
+                    onChange={(e) => setNewStopName(e.target.value)}
+                  />
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={!newStopName || newStopLat == null || newStopLng == null || addStop.isPending}
+                  onClick={() => addStop.mutate()}
+                >
+                  {addStop.isPending ? 'Adding…' : 'Add'}
+                </Button>
+              </div>
             </div>
           </div>
 
