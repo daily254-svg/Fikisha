@@ -54,9 +54,9 @@ export function DriverDashboard({ onNavigate }: DriverDashboardProps) {
         ]);
         if (!mounted) return;
 
-        setDriver(profileRes.data);
-        setActiveBus(busRes.data);
-        setRouteStudents(studentsRes.data);
+        setDriver(profileRes.data ?? null);
+        setActiveBus(busRes.data ?? null);
+        setRouteStudents(studentsRes.data ?? []);
 
         if (busRes.data) {
           const today = new Date().toISOString().slice(0, 10);
@@ -66,11 +66,12 @@ export function DriverDashboard({ onNavigate }: DriverDashboardProps) {
           });
           if (!mounted) return;
 
+          const events = eventsRes.data ?? [];
           const pickedUpIds = new Set(
-            eventsRes.data.filter((e) => e.type === 'PICKED_UP').map((e) => e.studentId)
+            events.filter((e) => e.type === 'PICKED_UP').map((e) => e.studentId)
           );
           const absentIds = new Set(
-            eventsRes.data.filter((e) => e.type === 'ABSENT').map((e) => e.studentId)
+            events.filter((e) => e.type === 'ABSENT').map((e) => e.studentId)
           );
           setPickedUpToday(pickedUpIds.size);
           setAbsentToday(absentIds.size);
@@ -91,7 +92,7 @@ export function DriverDashboard({ onNavigate }: DriverDashboardProps) {
   const bus = activeBus?.bus;
   const route = bus?.routes?.[0];
   const routeActive = !!activeBus?.activeTrip;
-  const totalStudents = routeStudents.reduce((sum, r) => sum + r.students.length, 0);
+  const totalStudents = (routeStudents ?? []).reduce((sum, r) => sum + r.students.length, 0);
   const pendingToday = Math.max(totalStudents - pickedUpToday - absentToday, 0);
   const pickupPercent = totalStudents > 0 ? Math.round((pickedUpToday / totalStudents) * 100) : 0;
 

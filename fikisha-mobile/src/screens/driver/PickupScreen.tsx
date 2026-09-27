@@ -54,8 +54,8 @@ export function DriverPickupScreen({ onBack, onNavigate }: DriverPickupScreenPro
           driversService.getActiveBus(),
           driversService.getRouteStudents(),
         ]);
-        setActiveBus(busRes.data);
-        setRouteStudents(studentsRes.data);
+        setActiveBus(busRes.data ?? null);
+        setRouteStudents(studentsRes.data ?? []);
 
         if (busRes.data) {
           const today = new Date().toISOString().slice(0, 10);
@@ -64,7 +64,7 @@ export function DriverPickupScreen({ onBack, onNavigate }: DriverPickupScreenPro
             date: today,
           });
           const initial: Record<string, Status> = {};
-          for (const event of eventsRes.data as TransportEvent[]) {
+          for (const event of (eventsRes.data ?? []) as TransportEvent[]) {
             if (event.type === 'PICKED_UP') initial[event.studentId] = 'picked';
             else if (event.type === 'ABSENT') initial[event.studentId] = 'absent';
           }

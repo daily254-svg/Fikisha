@@ -52,9 +52,9 @@ export function DriverRouteScreen({ onBack, onNavigate }: DriverRouteScreenProps
         driversService.getActiveBus(),
         driversService.getRouteStudents(),
       ]);
-      setActiveBus(busRes.data);
+      setActiveBus(busRes.data ?? null);
       setRouteActive(!!busRes.data?.activeTrip);
-      setRouteStudents(studentsRes.data);
+      setRouteStudents(studentsRes.data ?? []);
 
       if (busRes.data) {
         const today = new Date().toISOString().slice(0, 10);
@@ -63,7 +63,7 @@ export function DriverRouteScreen({ onBack, onNavigate }: DriverRouteScreenProps
           type: 'PICKED_UP',
           date: today,
         });
-        setPickedUpIds(new Set(eventsRes.data.map((e: TransportEvent) => e.studentId)));
+        setPickedUpIds(new Set((eventsRes.data ?? []).map((e: TransportEvent) => e.studentId)));
       }
     } catch (e) {
       console.error('Failed to load route', e);
