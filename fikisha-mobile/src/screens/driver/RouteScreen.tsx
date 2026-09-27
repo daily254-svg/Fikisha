@@ -39,6 +39,8 @@ export function DriverRouteScreen({ onBack, onNavigate }: DriverRouteScreenProps
   const [routeStudents, setRouteStudents] = useState<RouteStudents[]>([]);
   const [pickedUpIds, setPickedUpIds] = useState<Set<string>>(new Set());
   const [routeActive, setRouteActive] = useState(false);
+  const [isToggling, setIsToggling] = useState(false);
+  const [toggleError, setToggleError] = useState<string | null>(null);
   const [sheetExpanded, setSheetExpanded] = useState(false);
   const sheetHeight = useRef(new Animated.Value(200)).current;
 
@@ -119,14 +121,23 @@ export function DriverRouteScreen({ onBack, onNavigate }: DriverRouteScreenProps
   };
 
   const handleToggleRoute = async () => {
-    if (!activeBus || !route) return;
-    if (routeActive) {
-      await emitRouteEnd(activeBus.bus.id);
-      setRouteActive(false);
-      onBack();
-    } else {
-      await emitRouteStart(activeBus.bus.id, route.id);
-      setRouteActive(true);
+    if (!activeBus || !route || isToggling) return;
+    setIsToggling(true);
+    setToggleError(null);
+    try {
+      if (routeActive) {
+        await emitRouteEnd(activeBus.bus.id);
+        setRouteActive(false);
+        onBack();
+      } else {
+        await emitRouteStart(activeBus.bus.id, route.id);
+        setRouteActive(true);
+      }
+    } catch (e: any) {
+      console.error('Failed to toggle route', e);
+      setToggleError(e?.message ?? 'Something went wrong. Try again.');
+    } finally {
+      setIsToggling(false);
     }
   };
 
@@ -216,10 +227,16 @@ export function DriverRouteScreen({ onBack, onNavigate }: DriverRouteScreenProps
 
             <TouchableOpacity
               onPress={handleToggleRoute}
-              style={routeActive ? styles.endRouteButton : styles.startRouteButton}
+              disabled={isToggling}
+              style={[
+                routeActive ? styles.endRouteButton : styles.startRouteButton,
+                isToggling && styles.routeButtonDisabled,
+              ]}
               activeOpacity={0.8}
             >
-              {routeActive ? (
+              {isToggling ? (
+                <ActivityIndicator size="small" color={routeActive ? '#EF4444' : '#1B365D'} />
+              ) : routeActive ? (
                 <>
                   <Square size={18} color="#EF4444" fill="#EF4444" />
                   <Text style={styles.endRouteText}>End Route</Text>
@@ -231,6 +248,8 @@ export function DriverRouteScreen({ onBack, onNavigate }: DriverRouteScreenProps
                 </>
               )}
             </TouchableOpacity>
+
+            {toggleError && <Text style={styles.toggleErrorText}>{toggleError}</Text>}
 
             {sheetExpanded && (
               <ScrollView
@@ -525,5 +544,15 @@ const styles = StyleSheet.create({
     color: '#EF4444',
     fontWeight: '700',
     fontSize: 15,
+  },
+  routeButtonDisabled: {
+    opacity: 0.7,
+  },
+  toggleErrorText: {
+    color: '#EF4444',
+    fontSize: 12,
+    fontWeight: '500',
+    textAlign: 'center',
+    marginTop: 8,
   },
 });

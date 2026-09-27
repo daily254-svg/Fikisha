@@ -25,6 +25,12 @@ interface AuthenticatedSocket extends Socket {
   };
 }
 
+interface Ack {
+  success: boolean;
+  error?: string;
+  data?: any;
+}
+
 @SkipThrottle()
 @WebSocketGateway({
   cors: { origin: '*' }, // tighten in production
@@ -115,41 +121,53 @@ export class TrackingGateway
   async handleRouteStart(
     @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() payload: RouteStartDto,
-  ): Promise<void> {
-    if (!client.user) return;
+  ): Promise<Ack> {
+    if (!client.user) return { success: false, error: 'Not authenticated' };
 
     const { schoolId, sub } = client.user;
 
-    const result = await this.trackingService.handleRouteStart(
-      schoolId,
-      sub,
-      payload,
-    );
+    try {
+      const result = await this.trackingService.handleRouteStart(
+        schoolId,
+        sub,
+        payload,
+      );
 
-    this.logger.log(
-      `Broadcasting route_started to room: parents:${schoolId}`,
-    );
+      this.logger.log(
+        `Broadcasting route_started to room: parents:${schoolId}`,
+      );
 
-    this.server.to(`parents:${schoolId}`).emit('route_started', result);
-    this.server
-      .to(`school:${schoolId}:drivers`)
-      .emit('route_started', result);
+      this.server.to(`parents:${schoolId}`).emit('route_started', result);
+      this.server
+        .to(`school:${schoolId}:drivers`)
+        .emit('route_started', result);
+
+      return { success: true, data: result };
+    } catch (err) {
+      return { success: false, error: this.errorMessage(err) };
+    }
   }
 
   @SubscribeMessage('route_end')
   async handleRouteEnd(
     @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() payload: { busId: string },
-  ): Promise<void> {
-    if (!client.user) return;
+  ): Promise<Ack> {
+    if (!client.user) return { success: false, error: 'Not authenticated' };
 
     const { schoolId } = client.user;
 
-    await this.trackingService.handleRouteEnd(schoolId, payload.busId);
+    try {
+      await this.trackingService.handleRouteEnd(schoolId, payload.busId);
 
-    this.server.to(`parents:${schoolId}`).emit('route_ended', {
-      busId: payload.busId,
-    });
+      this.server.to(`parents:${schoolId}`).emit('route_ended', {
+        busId: payload.busId,
+      });
+
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: this.errorMessage(err) };
+    }
   }
 
   @SubscribeMessage('student_pickup')
@@ -157,17 +175,23 @@ export class TrackingGateway
   async handleStudentPickup(
     @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() payload: StudentEventDto,
-  ): Promise<void> {
-    if (!client.user) return;
+  ): Promise<Ack> {
+    if (!client.user) return { success: false, error: 'Not authenticated' };
 
-    const result = await this.trackingService.handleStudentPickup(
-      client.user.schoolId,
-      payload,
-    );
+    try {
+      const result = await this.trackingService.handleStudentPickup(
+        client.user.schoolId,
+        payload,
+      );
 
-    this.server
-      .to(`parents:${client.user.schoolId}`)
-      .emit('student_picked_up', result);
+      this.server
+        .to(`parents:${client.user.schoolId}`)
+        .emit('student_picked_up', result);
+
+      return { success: true, data: result };
+    } catch (err) {
+      return { success: false, error: this.errorMessage(err) };
+    }
   }
 
   @SubscribeMessage('student_dropoff')
@@ -175,17 +199,23 @@ export class TrackingGateway
   async handleStudentDropoff(
     @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() payload: StudentEventDto,
-  ): Promise<void> {
-    if (!client.user) return;
+  ): Promise<Ack> {
+    if (!client.user) return { success: false, error: 'Not authenticated' };
 
-    const result = await this.trackingService.handleStudentDropoff(
-      client.user.schoolId,
-      payload,
-    );
+    try {
+      const result = await this.trackingService.handleStudentDropoff(
+        client.user.schoolId,
+        payload,
+      );
 
-    this.server
-      .to(`parents:${client.user.schoolId}`)
-      .emit('student_dropped_off', result);
+      this.server
+        .to(`parents:${client.user.schoolId}`)
+        .emit('student_dropped_off', result);
+
+      return { success: true, data: result };
+    } catch (err) {
+      return { success: false, error: this.errorMessage(err) };
+    }
   }
 
   @SubscribeMessage('student_absent')
@@ -193,17 +223,27 @@ export class TrackingGateway
   async handleStudentAbsent(
     @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() payload: StudentEventDto,
-  ): Promise<void> {
-    if (!client.user) return;
+  ): Promise<Ack> {
+    if (!client.user) return { success: false, error: 'Not authenticated' };
 
-    const result = await this.trackingService.handleStudentAbsent(
-      client.user.schoolId,
-      payload,
-    );
+    try {
+      const result = await this.trackingService.handleStudentAbsent(
+        client.user.schoolId,
+        payload,
+      );
 
-    this.server
-      .to(`parents:${client.user.schoolId}`)
-      .emit('student_marked_absent', result);
+      this.server
+        .to(`parents:${client.user.schoolId}`)
+        .emit('student_marked_absent', result);
+
+      return { success: true, data: result };
+    } catch (err) {
+      return { success: false, error: this.errorMessage(err) };
+    }
+  }
+
+  private errorMessage(err: unknown): string {
+    return err instanceof Error ? err.message : 'Something went wrong';
   }
 
   private verifyToken(token: string): any | null {

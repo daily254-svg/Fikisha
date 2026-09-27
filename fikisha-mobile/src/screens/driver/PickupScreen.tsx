@@ -42,6 +42,7 @@ export function DriverPickupScreen({ onBack, onNavigate }: DriverPickupScreenPro
   const [activeBus, setActiveBus] = useState<ActiveBusAssignment | null>(null);
   const [routeStudents, setRouteStudents] = useState<RouteStudents[]>([]);
   const [statuses, setStatuses] = useState<Record<string, Status>>({});
+  const [statusError, setStatusError] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | Status>('all');
   const [search, setSearch] = useState('');
   const location = useLocation(false);
@@ -89,15 +90,22 @@ export function DriverPickupScreen({ onBack, onNavigate }: DriverPickupScreenPro
   const statusOf = (studentId: string): Status => statuses[studentId] ?? 'pending';
 
   const setStatus = async (studentId: string, status: Status) => {
-    if (!routeActive) return;
+    if (!routeActive || !activeBus) return;
+    const previous = statuses[studentId];
     setStatuses((prev) => ({ ...prev, [studentId]: status }));
-    if (!activeBus) return;
+    setStatusError(null);
     const lat = location.latitude ?? undefined;
     const lng = location.longitude ?? undefined;
-    if (status === 'picked') {
-      await emitStudentPickup(activeBus.bus.id, studentId, lat, lng);
-    } else if (status === 'absent') {
-      await emitStudentAbsent(activeBus.bus.id, studentId, lat, lng);
+    try {
+      if (status === 'picked') {
+        await emitStudentPickup(activeBus.bus.id, studentId, lat, lng);
+      } else if (status === 'absent') {
+        await emitStudentAbsent(activeBus.bus.id, studentId, lat, lng);
+      }
+    } catch (e: any) {
+      console.error('Failed to update student status', e);
+      setStatuses((prev) => ({ ...prev, [studentId]: previous ?? 'pending' }));
+      setStatusError(e?.message ?? 'Failed to update. Try again.');
     }
   };
 
@@ -185,6 +193,13 @@ export function DriverPickupScreen({ onBack, onNavigate }: DriverPickupScreenPro
           >
             <Text style={styles.notStartedButtonText}>Go to Route</Text>
           </TouchableOpacity>
+        </View>
+      )}
+
+      {statusError && (
+        <View style={styles.statusErrorBanner}>
+          <AlertTriangle size={16} color="#EF4444" />
+          <Text style={styles.statusErrorText}>{statusError}</Text>
         </View>
       )}
 
@@ -367,6 +382,22 @@ const styles = StyleSheet.create({
   },
   actionButtonDisabled: {
     opacity: 0.4,
+  },
+  statusErrorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    backgroundColor: '#FEF2F2',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(239,68,68,0.15)',
+  },
+  statusErrorText: {
+    flex: 1,
+    color: '#B91C1C',
+    fontSize: 12,
+    fontWeight: '500',
   },
   searchContainer: {
     backgroundColor: '#ffffff',
