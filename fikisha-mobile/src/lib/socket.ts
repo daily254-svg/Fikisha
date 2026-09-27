@@ -42,7 +42,7 @@ interface Ack<T = any> {
   data?: T;
 }
 
-const ACK_TIMEOUT_MS = 8000;
+const ACK_TIMEOUT_MS = 10000;
 
 /**
  * Emits an event and waits for the server's acknowledgement instead of
@@ -52,21 +52,36 @@ const ACK_TIMEOUT_MS = 8000;
  * so any UI that optimistically updates on that alone drifts out of sync
  * with what the backend actually did.
  */
-function emitWithAck<T = any>(event: string, payload: any): Promise<T> {
-  return new Promise((resolve, reject) => {
-    getSocket().then((socket) => {
-      const timer = setTimeout(() => {
-        reject(new Error('Request timed out — check your connection and try again.'));
-      }, ACK_TIMEOUT_MS);
+async function emitWithAck<T = any>(event: string, payload: any): Promise<T> {
+  const socket = await getSocket();
 
-      socket.emit(event, payload, (ack: Ack<T>) => {
-        clearTimeout(timer);
-        if (ack?.success) {
-          resolve(ack.data as T);
-        } else {
-          reject(new Error(ack?.error ?? 'Something went wrong. Try again.'));
-        }
-      });
+  // socket.io queues emits made while disconnected and flushes them on
+  // reconnect, but if the socket never managed to connect at all (bad
+  // token, server unreachable, dropped network) that queued emit just
+  // waits forever — try to (re)connect up front so the timeout below
+  // means something concrete instead of "who knows".
+  if (!socket.connected) {
+    await connectSocket();
+  }
+
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      const reason = socket.connected
+        ? 'The server did not respond in time. Try again.'
+        : 'Not connected to the server — check your connection and try again.';
+      console.warn(
+        `[Socket] "${event}" timed out after ${ACK_TIMEOUT_MS}ms (connected: ${socket.connected})`,
+      );
+      reject(new Error(reason));
+    }, ACK_TIMEOUT_MS);
+
+    socket.emit(event, payload, (ack: Ack<T>) => {
+      clearTimeout(timer);
+      if (ack?.success) {
+        resolve(ack.data as T);
+      } else {
+        reject(new Error(ack?.error ?? 'Something went wrong. Try again.'));
+      }
     });
   });
 }
