@@ -152,7 +152,7 @@ export function DriverRouteScreen({ onBack, onNavigate }: DriverRouteScreenProps
           }))}
           busLocation={
             location.latitude != null && location.longitude != null
-              ? { lat: location.latitude, lng: location.longitude }
+              ? { lat: location.latitude, lng: location.longitude, heading: location.heading }
               : null
           }
           height={208}

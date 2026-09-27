@@ -117,7 +117,9 @@ export function LiveTrackingScreen({ onBack }: LiveTrackingScreenProps) {
               longitude: s.longitude,
               sequence: s.sequence,
             }))}
-            busLocation={location ? { lat: location.lat, lng: location.lng } : null}
+            busLocation={
+              location ? { lat: location.lat, lng: location.lng, heading: location.heading } : null
+            }
           />
         </View>
 

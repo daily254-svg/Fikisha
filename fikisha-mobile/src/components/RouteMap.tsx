@@ -1,6 +1,6 @@
-import React, { useMemo, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import MapView, { Marker, Polyline, Region } from 'react-native-maps';
+import MapView, { Marker, MapMarker, Polyline, Region } from 'react-native-maps';
 import { Bus } from 'lucide-react-native';
 
 export interface MapStop {
@@ -11,9 +11,16 @@ export interface MapStop {
   sequence: number;
 }
 
+export interface MapBusLocation {
+  lat: number;
+  lng: number;
+  /** Degrees, 0 = north. Rotates the marker to face direction of travel. */
+  heading?: number | null;
+}
+
 interface RouteMapProps {
   stops: MapStop[];
-  busLocation?: { lat: number; lng: number } | null;
+  busLocation?: MapBusLocation | null;
   /** Fixed height in px. Omit to have the map fill its parent container. */
   height?: number;
 }
@@ -36,6 +43,33 @@ function regionFor(
     latitudeDelta: Math.max(maxLat - minLat, 0.01) * 1.6,
     longitudeDelta: Math.max(maxLng - minLng, 0.01) * 1.6,
   };
+}
+
+/** Glides to each new GPS fix instead of snapping, and points in the
+ * direction of travel — the same feel as a taxi-hailing app's car marker. */
+function BusMarker({ location }: { location: MapBusLocation }) {
+  const markerRef = useRef<MapMarker>(null);
+  const [coordinate, setCoordinate] = useState({
+    latitude: location.lat,
+    longitude: location.lng,
+  });
+
+  useEffect(() => {
+    const next = { latitude: location.lat, longitude: location.lng };
+    markerRef.current?.animateMarkerToCoordinate(next, 1000);
+    setCoordinate(next);
+  }, [location.lat, location.lng]);
+
+  return (
+    <Marker ref={markerRef} coordinate={coordinate} anchor={{ x: 0.5, y: 0.5 }} title="Bus">
+      <View style={{ transform: [{ rotate: `${location.heading ?? 0}deg` }] }}>
+        <View style={styles.busMarkerPointer} />
+        <View style={styles.busMarker}>
+          <Bus size={16} color="#F5C542" />
+        </View>
+      </View>
+    </Marker>
+  );
 }
 
 export function RouteMap({ stops, busLocation, height }: RouteMapProps) {
@@ -85,17 +119,7 @@ export function RouteMap({ stops, busLocation, height }: RouteMapProps) {
           />
         )}
 
-        {busLocation && (
-          <Marker
-            coordinate={{ latitude: busLocation.lat, longitude: busLocation.lng }}
-            title="Bus"
-            anchor={{ x: 0.5, y: 0.5 }}
-          >
-            <View style={styles.busMarker}>
-              <Bus size={16} color="#F5C542" />
-            </View>
-          </Marker>
-        )}
+        {busLocation && <BusMarker location={busLocation} />}
       </MapView>
     </View>
   );
@@ -119,5 +143,17 @@ const styles = StyleSheet.create({
     borderColor: '#F5C542',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  busMarkerPointer: {
+    alignSelf: 'center',
+    width: 0,
+    height: 0,
+    borderLeftWidth: 6,
+    borderRightWidth: 6,
+    borderBottomWidth: 9,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderBottomColor: '#1B365D',
+    marginBottom: -3,
   },
 });
