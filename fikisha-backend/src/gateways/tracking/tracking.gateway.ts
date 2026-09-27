@@ -118,10 +118,11 @@ export class TrackingGateway
   ): Promise<void> {
     if (!client.user) return;
 
-    const { schoolId } = client.user;
+    const { schoolId, sub } = client.user;
 
     const result = await this.trackingService.handleRouteStart(
       schoolId,
+      sub,
       payload,
     );
 

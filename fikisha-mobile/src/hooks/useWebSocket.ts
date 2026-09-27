@@ -12,7 +12,7 @@ import { GpsUpdate, TransportEvent } from '@/types';
  * since calling it again would re-run this listener setup.
  */
 export function useWebSocket(enabled: boolean = true) {
-  const { updateBusLocation } = useTrackingStore();
+  const { updateBusLocation, clearBusLocation } = useTrackingStore();
   const { prependNotification } = useNotificationsStore();
 
   useEffect(() => {
@@ -39,7 +39,8 @@ export function useWebSocket(enabled: boolean = true) {
         });
       };
 
-      const handleRouteEnded = () => {
+      const handleRouteEnded = (payload: { busId: string }) => {
+        if (payload?.busId) clearBusLocation(payload.busId);
         prependNotification({
           type: 'BUS_APPROACHING',
           title: 'Route ended',

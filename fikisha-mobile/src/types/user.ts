@@ -66,6 +66,7 @@ export interface DriverProfile {
 export interface ActiveBusAssignment {
   id: string;
   bus: Bus;
+  activeTrip?: { id: string; routeId: string; startedAt: string } | null;
 }
 
 export interface RouteStudentEntry extends Student {

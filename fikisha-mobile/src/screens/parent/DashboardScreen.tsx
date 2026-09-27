@@ -128,6 +128,38 @@ export function ParentDashboard({ onNavigate }: ParentDashboardProps) {
 
   const location = liveLocation ?? dbLocation;
 
+  const primaryStatus = droppedOffEvent
+    ? {
+        label: 'Trip complete',
+        sub: `${busRegistration ?? 'Bus'} · Dropped off ${formatTime(droppedOffEvent.createdAt)}`,
+        color: '#22C55E',
+        bg: '#F0FDF4',
+        Icon: CheckCircle2,
+      }
+    : isLive
+      ? {
+          label: 'On the way',
+          sub: `${busRegistration ?? 'Bus'} · ${liveLocation ? `${Math.round(liveLocation.speed)} km/h` : 'Live'}`,
+          color: '#1B365D',
+          bg: '#FFF8E1',
+          Icon: Navigation,
+        }
+      : pickedUpEvent
+        ? {
+            label: 'Picked up',
+            sub: `${busRegistration ?? 'Bus'} · ${formatTime(pickedUpEvent.createdAt)}`,
+            color: '#F97316',
+            bg: '#FFF7ED',
+            Icon: CheckCircle2,
+          }
+        : {
+            label: 'Not started yet',
+            sub: location ? `Last seen ${timeAgo(location.updatedAt)}` : 'Waiting for the bus to start',
+            color: '#6B7FA3',
+            bg: '#F7F9FC',
+            Icon: Bus,
+          };
+
   if (isLoading) {
     return (
       <SafeAreaView style={[styles.container, styles.centered]}>
@@ -178,7 +210,7 @@ export function ParentDashboard({ onNavigate }: ParentDashboardProps) {
         </View>
 
         <View style={styles.body}>
-          {/* Live tracking card */}
+          {/* Trip status card */}
           {busId ? (
             <TouchableOpacity
               onPress={() => onNavigate('tracking')}
@@ -186,25 +218,30 @@ export function ParentDashboard({ onNavigate }: ParentDashboardProps) {
               activeOpacity={0.9}
             >
               <View style={styles.trackingInfo}>
-                <View style={styles.trackingHeader}>
-                  <View style={styles.trackingHeaderLeft}>
-                    <View style={styles.busIconCircle}>
-                      <Bus size={18} color="#1B365D" />
-                    </View>
-                    <View>
-                      <Text style={styles.trackingBus}>{busRegistration ?? 'Bus'}</Text>
-                      <Text style={styles.trackingDetail}>
-                        {isLive && liveLocation
-                          ? `Live · ${Math.round(liveLocation.speed)} km/h`
-                          : location
-                            ? `Last seen ${timeAgo(location.updatedAt)}`
-                            : 'No location reported yet'}
-                      </Text>
-                    </View>
+                <View style={styles.primaryStatusRow}>
+                  <View style={[styles.primaryStatusIcon, { backgroundColor: primaryStatus.bg }]}>
+                    <primaryStatus.Icon size={22} color={primaryStatus.color} />
                   </View>
-                  <View style={styles.trackLiveRow}>
-                    <Text style={styles.trackLiveText}>Track live</Text>
-                    <ChevronRight size={16} color="#1B365D" />
+                  <View style={styles.primaryStatusTextCol}>
+                    <Text style={styles.primaryStatusLabel}>{primaryStatus.label}</Text>
+                    <Text style={styles.primaryStatusSub}>{primaryStatus.sub}</Text>
+                  </View>
+                  <ChevronRight size={18} color="#CBD5E1" />
+                </View>
+
+                <View style={styles.timelineRow}>
+                  <View style={styles.timelineItem}>
+                    <CheckCircle2 size={13} color={pickedUpEvent ? '#22C55E' : '#CBD5E1'} />
+                    <Text style={styles.timelineText}>
+                      Picked up {pickedUpEvent ? formatTime(pickedUpEvent.createdAt) : '—'}
+                    </Text>
+                  </View>
+                  <View style={styles.timelineDivider} />
+                  <View style={styles.timelineItem}>
+                    <CheckCircle2 size={13} color={droppedOffEvent ? '#22C55E' : '#CBD5E1'} />
+                    <Text style={styles.timelineText}>
+                      Dropped off {droppedOffEvent ? formatTime(droppedOffEvent.createdAt) : '—'}
+                    </Text>
                   </View>
                 </View>
 
@@ -219,49 +256,26 @@ export function ParentDashboard({ onNavigate }: ParentDashboardProps) {
                   <MapPin size={13} color="#6B7FA3" />
                   <Text style={styles.changeStopText}>Change pickup / drop-off stop</Text>
                 </TouchableOpacity>
-
-                {/* Status steps */}
-                <View style={styles.statusSteps}>
-                  {[
-                    { label: 'Picked up', done: !!pickedUpEvent, time: pickedUpEvent ? formatTime(pickedUpEvent.createdAt) : '—' },
-                    { label: 'En route', done: isLive, time: isLive ? 'Now' : '—' },
-                    { label: 'At school', done: !!droppedOffEvent, time: droppedOffEvent ? formatTime(droppedOffEvent.createdAt) : '—' },
-                  ].map((step, i) => (
-                    <View key={i} style={styles.statusStep}>
-                      <View
-                        style={[
-                          styles.statusStepIcon,
-                          { backgroundColor: step.done ? '#22C55E' : '#EFF2F7' },
-                        ]}
-                      >
-                        {step.done ? (
-                          <CheckCircle2 size={14} color="#ffffff" />
-                        ) : (
-                          <View style={styles.pendingDot} />
-                        )}
-                      </View>
-                      <Text
-                        style={[
-                          styles.statusStepLabel,
-                          { color: step.done ? '#1B365D' : '#6B7FA3' },
-                        ]}
-                      >
-                        {step.label}
-                      </Text>
-                      <Text style={styles.statusStepTime}>{step.time}</Text>
-                    </View>
-                  ))}
-                </View>
               </View>
             </TouchableOpacity>
           ) : (
             <View style={styles.trackingCard}>
               <View style={styles.trackingInfo}>
-                <Text style={styles.noBusText}>
-                  {selectedChild
-                    ? "Your child isn't assigned to a route yet."
-                    : 'Contact your school to link a student to your account.'}
-                </Text>
+                <View style={styles.primaryStatusRow}>
+                  <View style={[styles.primaryStatusIcon, { backgroundColor: '#F7F9FC' }]}>
+                    <Bus size={22} color="#6B7FA3" />
+                  </View>
+                  <View style={styles.primaryStatusTextCol}>
+                    <Text style={styles.primaryStatusLabel}>
+                      {selectedChild ? 'No route assigned' : 'No student linked'}
+                    </Text>
+                    <Text style={styles.primaryStatusSub}>
+                      {selectedChild
+                        ? "Your child isn't assigned to a route yet."
+                        : 'Contact your school to link a student to your account.'}
+                    </Text>
+                  </View>
+                </View>
                 {selectedChild && (
                   <TouchableOpacity
                     onPress={() => onNavigate('select-stop')}
@@ -441,10 +455,55 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(27,54,93,0.06)',
     overflow: 'hidden',
   },
-  noBusText: {
+  primaryStatusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  primaryStatusIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  primaryStatusTextCol: {
+    flex: 1,
+  },
+  primaryStatusLabel: {
+    color: '#1B365D',
+    fontSize: 17,
+    fontWeight: '700',
+  },
+  primaryStatusSub: {
     color: '#6B7FA3',
-    fontSize: 13,
-    lineHeight: 19,
+    fontSize: 12,
+    marginTop: 2,
+  },
+  timelineRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 14,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(27,54,93,0.06)',
+  },
+  timelineItem: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  timelineDivider: {
+    width: 1,
+    height: 12,
+    backgroundColor: 'rgba(27,54,93,0.1)',
+    marginHorizontal: 12,
+  },
+  timelineText: {
+    color: '#6B7FA3',
+    fontSize: 11,
+    fontWeight: '500',
   },
   chooseStopButton: {
     flexDirection: 'row',
@@ -477,77 +536,6 @@ const styles = StyleSheet.create({
   },
   trackingInfo: {
     padding: 16,
-  },
-  trackingHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  trackingHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  busIconCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 14,
-    backgroundColor: '#FFF8E1',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  trackingBus: {
-    color: '#1B365D',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  trackingDetail: {
-    color: '#6B7FA3',
-    fontSize: 12,
-    marginTop: 2,
-  },
-  trackLiveRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  trackLiveText: {
-    color: '#1B365D',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  // Status steps
-  statusSteps: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  statusStep: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  statusStepIcon: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 4,
-  },
-  pendingDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#CBD5E1',
-  },
-  statusStepLabel: {
-    fontSize: 11,
-    fontWeight: '500',
-    textAlign: 'center',
-  },
-  statusStepTime: {
-    color: '#6B7FA3',
-    fontSize: 10,
   },
   // Alerts
   alertsSection: {

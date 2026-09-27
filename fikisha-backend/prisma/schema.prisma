@@ -137,6 +137,7 @@ model Driver {
 
   busAssignments BusAssignment[]
   incidents      Incident[]
+  trips          Trip[]
 
   createdAt DateTime @default(now())
 }
@@ -156,6 +157,7 @@ model Bus {
   events      TransportEvent[]       // One-to-many with TransportEvent
   locationHistory BusLocationHistory[] // One-to-many with BusLocationHistory (ADD THIS)
   incidents   Incident[]
+  trips       Trip[]
 
   createdAt DateTime @default(now())
 
@@ -197,6 +199,7 @@ model Route {
 
   stops     RouteStop[]
   students  StudentRoute[]
+  trips     Trip[]
 
   createdAt DateTime @default(now())
 
@@ -360,4 +363,34 @@ enum IncidentType {
   HAZARD
   MECHANICAL
   EMERGENCY
+}
+
+// TRIPS (durable record of a driver running a route — start/end times,
+// the source of truth for "is this bus currently on an active trip")
+model Trip {
+  id        String     @id @default(uuid())
+  schoolId  String
+
+  busId     String
+  bus       Bus        @relation(fields: [busId], references: [id])
+
+  routeId   String
+  route     Route      @relation(fields: [routeId], references: [id])
+
+  driverId  String
+  driver    Driver     @relation(fields: [driverId], references: [id])
+
+  startedAt DateTime   @default(now())
+  endedAt   DateTime?
+  status    TripStatus @default(ACTIVE)
+
+  createdAt DateTime   @default(now())
+
+  @@index([schoolId])
+  @@index([busId, status])
+}
+
+enum TripStatus {
+  ACTIVE
+  COMPLETED
 }

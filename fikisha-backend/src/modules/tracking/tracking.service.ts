@@ -68,7 +68,11 @@ export class TrackingService {
     await this.runGeofenceCheck(schoolId, payload.busId, payload.lat, payload.lng);
   }
 
-  async handleRouteStart(schoolId: string, payload: { busId: string; routeId: string }): Promise<any> {
+  async handleRouteStart(
+    schoolId: string,
+    userId: string,
+    payload: { busId: string; routeId: string },
+  ): Promise<any> {
     // 1. Verify bus belongs to school
     const bus = await this.prisma.bus.findUnique({
       where: { id: payload.busId },
@@ -88,13 +92,37 @@ export class TrackingService {
       throw new Error('Route not found in this school');
     }
 
-    // 3. Store route assignment in Redis
+    const driver = await this.prisma.driver.findUnique({ where: { userId } });
+    if (!driver) {
+      throw new Error('Driver profile not found');
+    }
+
+    // 3. Persist the trip — closing any trip left dangling by a crashed or
+    // never-ended previous session on this bus first, so there's never more
+    // than one ACTIVE trip per bus.
+    const trip = await this.prisma.$transaction(async (tx) => {
+      await tx.trip.updateMany({
+        where: { busId: payload.busId, status: 'ACTIVE' },
+        data: { status: 'COMPLETED', endedAt: new Date() },
+      });
+
+      return tx.trip.create({
+        data: {
+          schoolId,
+          busId: payload.busId,
+          routeId: payload.routeId,
+          driverId: driver.id,
+        },
+      });
+    });
+
+    // 4. Store route assignment in Redis (fast-path cache for geofencing)
     await this.redisService.set(
       `bus:${payload.busId}:route`,
       payload.routeId,
     );
 
-    // 4. Cache stops in Redis
+    // 5. Cache stops in Redis
     const stops = route.stops.map((stop) => ({
       id: stop.id,
       name: stop.name,
@@ -109,7 +137,7 @@ export class TrackingService {
       JSON.stringify(stops),
     );
 
-    return { busId: payload.busId, routeId: payload.routeId };
+    return { busId: payload.busId, routeId: payload.routeId, tripId: trip.id };
   }
 
   async getLocationHistory(schoolId: string, busId: string, limit: number = 50) {
@@ -228,6 +256,11 @@ export class TrackingService {
   }
 
   async handleRouteEnd(_schoolId: string, busId: string): Promise<void> {
+    await this.prisma.trip.updateMany({
+      where: { busId, status: 'ACTIVE' },
+      data: { status: 'COMPLETED', endedAt: new Date() },
+    });
+
     await this.redisService.del(`bus:${busId}:route`);
   }
 

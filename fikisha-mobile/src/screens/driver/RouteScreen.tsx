@@ -1,11 +1,13 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
   ScrollView,
+  Animated,
   ActivityIndicator,
+  StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -16,6 +18,8 @@ import {
   MapPin,
   Play,
   Square,
+  ChevronUp,
+  ChevronDown,
 } from 'lucide-react-native';
 import { driversService } from '@/services/drivers.service';
 import { trackingService } from '@/services/tracking.service';
@@ -35,6 +39,8 @@ export function DriverRouteScreen({ onBack, onNavigate }: DriverRouteScreenProps
   const [routeStudents, setRouteStudents] = useState<RouteStudents[]>([]);
   const [pickedUpIds, setPickedUpIds] = useState<Set<string>>(new Set());
   const [routeActive, setRouteActive] = useState(false);
+  const [sheetExpanded, setSheetExpanded] = useState(false);
+  const sheetHeight = useRef(new Animated.Value(200)).current;
 
   const location = useLocation(routeActive);
 
@@ -45,6 +51,7 @@ export function DriverRouteScreen({ onBack, onNavigate }: DriverRouteScreenProps
         driversService.getRouteStudents(),
       ]);
       setActiveBus(busRes.data);
+      setRouteActive(!!busRes.data?.activeTrip);
       setRouteStudents(studentsRes.data);
 
       if (busRes.data) {
@@ -105,6 +112,12 @@ export function DriverRouteScreen({ onBack, onNavigate }: DriverRouteScreenProps
   const totalStops = stopStatus.length;
   const progressPercent = totalStops > 0 ? Math.round((doneCount / totalStops) * 100) : 0;
 
+  const toggleSheet = () => {
+    const toValue = sheetExpanded ? 200 : 520;
+    Animated.spring(sheetHeight, { toValue, useNativeDriver: false, friction: 8 }).start();
+    setSheetExpanded(!sheetExpanded);
+  };
+
   const handleToggleRoute = async () => {
     if (!activeBus || !route) return;
     if (routeActive) {
@@ -140,140 +153,153 @@ export function DriverRouteScreen({ onBack, onNavigate }: DriverRouteScreenProps
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Map area */}
-      <View style={styles.mapContainer}>
-        <RouteMap
-          stops={stops.map((s) => ({
-            id: s.id,
-            name: s.name,
-            latitude: s.latitude,
-            longitude: s.longitude,
-            sequence: s.sequence,
-          }))}
-          busLocation={
-            location.latitude != null && location.longitude != null
-              ? { lat: location.latitude, lng: location.longitude, heading: location.heading }
-              : null
-          }
-          height={208}
-        />
-
-        {/* Top bar */}
-        <View style={styles.topBar}>
-          <TouchableOpacity onPress={onBack} style={styles.topBarButton} activeOpacity={0.8}>
-            <ArrowLeft size={20} color="#1B365D" />
-          </TouchableOpacity>
-          <View style={styles.routeActiveBadge}>
-            <Navigation size={14} color={routeActive ? '#22C55E' : '#6B7FA3'} />
-            <Text style={styles.routeActiveText}>
-              {routeActive ? 'Route Active' : 'Not Started'}
-            </Text>
-          </View>
-          <TouchableOpacity
-            onPress={() => onNavigate('driver-pickup')}
-            style={styles.topBarButton}
-            activeOpacity={0.8}
-          >
-            <MapPin size={18} color="#F5C542" />
-          </TouchableOpacity>
+      <StatusBar barStyle="dark-content" backgroundColor="#E8F4FD" translucent />
+      <View style={styles.container}>
+        <View style={styles.mapContainer}>
+          <RouteMap
+            stops={stops.map((s) => ({
+              id: s.id,
+              name: s.name,
+              latitude: s.latitude,
+              longitude: s.longitude,
+              sequence: s.sequence,
+            }))}
+            busLocation={
+              location.latitude != null && location.longitude != null
+                ? { lat: location.latitude, lng: location.longitude, heading: location.heading }
+                : null
+            }
+          />
         </View>
-      </View>
 
-      {/* Progress bar */}
-      <View style={styles.progressContainer}>
-        <View style={styles.progressLabels}>
-          <Text style={styles.progressLabel}>
-            {totalStops > 0 ? `${doneCount} of ${totalStops} stops` : 'No stops on this route'}
-          </Text>
-          <Text style={styles.progressPercent}>{progressPercent}% complete</Text>
-        </View>
-        <View style={styles.progressBarBg}>
-          <View style={[styles.progressBarFill, { width: `${progressPercent}%` }]} />
-        </View>
-      </View>
-
-      {/* Stop list */}
-      <ScrollView
-        style={styles.stopListContainer}
-        contentContainerStyle={styles.stopListContent}
-        showsVerticalScrollIndicator={false}
-      >
-        <Text style={styles.stopListTitle}>Route Stops</Text>
-        {stopStatus.map(({ stop, students: stopStudents, status }) => (
-          <View
-            key={stop.id}
-            style={[
-              styles.stopCard,
-              {
-                backgroundColor: status === 'active' ? '#FFF8E1' : '#ffffff',
-                borderColor: status === 'active' ? 'rgba(245,197,66,0.4)' : 'rgba(27,54,93,0.06)',
-              },
-            ]}
-          >
-            <View
-              style={[
-                styles.stopIcon,
-                {
-                  backgroundColor:
-                    status === 'done'
-                      ? 'rgba(34,197,94,0.12)'
-                      : status === 'active'
-                        ? '#F5C542'
-                        : '#EFF2F7',
-                },
-              ]}
-            >
-              {status === 'done' ? (
-                <CheckCircle2 size={18} color="#22C55E" />
-              ) : status === 'active' ? (
-                <Navigation size={18} color="#1B365D" />
-              ) : (
-                <CircleIcon size={16} color="#CBD5E1" />
-              )}
-            </View>
-
-            <View style={styles.stopInfo}>
-              <Text
-                style={[
-                  styles.stopName,
-                  {
-                    color: status === 'pending' ? '#6B7FA3' : '#1B365D',
-                    fontWeight: status === 'active' ? '700' : '500',
-                  },
-                ]}
-              >
-                {stop.sequence}. {stop.name}
+        <View style={styles.topOverlay}>
+          <View style={styles.topBar}>
+            <TouchableOpacity onPress={onBack} style={styles.topBarButton} activeOpacity={0.8}>
+              <ArrowLeft size={20} color="#1B365D" />
+            </TouchableOpacity>
+            <View style={styles.routeActiveBadge}>
+              <Navigation size={14} color={routeActive ? '#22C55E' : '#6B7FA3'} />
+              <Text style={styles.routeActiveText}>
+                {routeActive ? 'Route Active' : 'Not Started'}
               </Text>
-              {stopStudents.length > 0 && (
-                <Text style={styles.stopStudents}>
-                  {stopStudents.length} student{stopStudents.length !== 1 ? 's' : ''}
-                </Text>
-              )}
+            </View>
+            <TouchableOpacity
+              onPress={() => onNavigate('driver-pickup')}
+              style={styles.topBarButton}
+              activeOpacity={0.8}
+            >
+              <MapPin size={18} color="#F5C542" />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <Animated.View style={[styles.bottomSheet, { height: sheetHeight }]}>
+          <TouchableOpacity onPress={toggleSheet} style={styles.sheetHandle} activeOpacity={0.8}>
+            <View style={styles.sheetHandleBar} />
+            {sheetExpanded ? (
+              <ChevronDown size={16} color="#6B7FA3" />
+            ) : (
+              <ChevronUp size={16} color="#6B7FA3" />
+            )}
+          </TouchableOpacity>
+
+          <View style={styles.sheetContent}>
+            <View style={styles.progressLabels}>
+              <Text style={styles.progressLabel}>
+                {totalStops > 0 ? `${doneCount} of ${totalStops} stops` : 'No stops on this route'}
+              </Text>
+              <Text style={styles.progressPercent}>{progressPercent}% complete</Text>
+            </View>
+            <View style={styles.progressBarBg}>
+              <View style={[styles.progressBarFill, { width: `${progressPercent}%` }]} />
             </View>
 
-            {status === 'done' && <Text style={styles.stopDoneText}>Done</Text>}
-            {status === 'active' && <Text style={styles.stopNextText}>Next</Text>}
-          </View>
-        ))}
+            <TouchableOpacity
+              onPress={handleToggleRoute}
+              style={routeActive ? styles.endRouteButton : styles.startRouteButton}
+              activeOpacity={0.8}
+            >
+              {routeActive ? (
+                <>
+                  <Square size={18} color="#EF4444" fill="#EF4444" />
+                  <Text style={styles.endRouteText}>End Route</Text>
+                </>
+              ) : (
+                <>
+                  <Play size={18} color="#1B365D" fill="#1B365D" />
+                  <Text style={styles.startRouteText}>Start Route</Text>
+                </>
+              )}
+            </TouchableOpacity>
 
-        <TouchableOpacity
-          onPress={handleToggleRoute}
-          style={routeActive ? styles.endRouteButton : styles.startRouteButton}
-          activeOpacity={0.8}
-        >
-          {routeActive ? (
-            <>
-              <Square size={18} color="#EF4444" fill="#EF4444" />
-              <Text style={styles.endRouteText}>End Route</Text>
-            </>
-          ) : (
-            <>
-              <Play size={18} color="#1B365D" fill="#1B365D" />
-              <Text style={styles.startRouteText}>Start Route</Text>
-            </>
-          )}
-        </TouchableOpacity>
-      </ScrollView>
+            {sheetExpanded && (
+              <ScrollView
+                style={styles.stopListContainer}
+                contentContainerStyle={styles.stopListContent}
+                showsVerticalScrollIndicator={false}
+              >
+                <Text style={styles.stopListTitle}>Route Stops</Text>
+                {stopStatus.map(({ stop, students: stopStudents, status }) => (
+                  <View
+                    key={stop.id}
+                    style={[
+                      styles.stopCard,
+                      {
+                        backgroundColor: status === 'active' ? '#FFF8E1' : '#ffffff',
+                        borderColor: status === 'active' ? 'rgba(245,197,66,0.4)' : 'rgba(27,54,93,0.06)',
+                      },
+                    ]}
+                  >
+                    <View
+                      style={[
+                        styles.stopIcon,
+                        {
+                          backgroundColor:
+                            status === 'done'
+                              ? 'rgba(34,197,94,0.12)'
+                              : status === 'active'
+                                ? '#F5C542'
+                                : '#EFF2F7',
+                        },
+                      ]}
+                    >
+                      {status === 'done' ? (
+                        <CheckCircle2 size={18} color="#22C55E" />
+                      ) : status === 'active' ? (
+                        <Navigation size={18} color="#1B365D" />
+                      ) : (
+                        <CircleIcon size={16} color="#CBD5E1" />
+                      )}
+                    </View>
+
+                    <View style={styles.stopInfo}>
+                      <Text
+                        style={[
+                          styles.stopName,
+                          {
+                            color: status === 'pending' ? '#6B7FA3' : '#1B365D',
+                            fontWeight: status === 'active' ? '700' : '500',
+                          },
+                        ]}
+                      >
+                        {stop.sequence}. {stop.name}
+                      </Text>
+                      {stopStudents.length > 0 && (
+                        <Text style={styles.stopStudents}>
+                          {stopStudents.length} student{stopStudents.length !== 1 ? 's' : ''}
+                        </Text>
+                      )}
+                    </View>
+
+                    {status === 'done' && <Text style={styles.stopDoneText}>Done</Text>}
+                    {status === 'active' && <Text style={styles.stopNextText}>Next</Text>}
+                  </View>
+                ))}
+              </ScrollView>
+            )}
+          </View>
+        </Animated.View>
+      </View>
     </SafeAreaView>
   );
 }
@@ -281,7 +307,7 @@ export function DriverRouteScreen({ onBack, onNavigate }: DriverRouteScreenProps
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F7F9FC',
+    backgroundColor: '#E8F4FD',
   },
   centered: {
     alignItems: 'center',
@@ -307,17 +333,22 @@ const styles = StyleSheet.create({
   },
   // Map
   mapContainer: {
-    height: 208,
+    flex: 1,
   },
-  topBar: {
+  topOverlay: {
     position: 'absolute',
-    top: 12,
+    top: 0,
     left: 0,
     right: 0,
+    zIndex: 10,
+  },
+  topBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 12,
   },
   topBarButton: {
     width: 40,
@@ -351,14 +382,40 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
   },
-  // Progress
-  progressContainer: {
+  // Bottom sheet
+  bottomSheet: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     backgroundColor: '#ffffff',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(27,54,93,0.06)',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 30,
+    zIndex: 20,
   },
+  sheetHandle: {
+    alignItems: 'center',
+    paddingTop: 12,
+    paddingBottom: 4,
+  },
+  sheetHandleBar: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#E2E8F0',
+    marginBottom: 8,
+  },
+  sheetContent: {
+    paddingHorizontal: 20,
+    paddingTop: 2,
+    flex: 1,
+  },
+  // Progress
   progressLabels: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -388,9 +445,9 @@ const styles = StyleSheet.create({
   // Stop list
   stopListContainer: {
     flex: 1,
+    marginTop: 16,
   },
   stopListContent: {
-    padding: 20,
     gap: 8,
     paddingBottom: 24,
   },
@@ -442,7 +499,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    marginTop: 20,
+    marginTop: 16,
     paddingVertical: 16,
     borderRadius: 16,
     backgroundColor: '#F5C542',
@@ -457,7 +514,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    marginTop: 20,
+    marginTop: 16,
     paddingVertical: 16,
     borderRadius: 16,
     backgroundColor: '#FEF2F2',

@@ -62,7 +62,13 @@ export class DriversService {
       return null;
     }
 
-    return assignment;
+    const activeTrip = await this.prisma.trip.findFirst({
+      where: { busId: assignment.bus.id, status: 'ACTIVE' },
+      orderBy: { startedAt: 'desc' },
+      select: { id: true, routeId: true, startedAt: true },
+    });
+
+    return { ...assignment, activeTrip };
   }
 
   async getRouteStudents(userId: string) {

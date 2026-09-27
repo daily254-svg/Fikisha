@@ -7,6 +7,7 @@ interface TrackingState {
   currentBusId: string | null;
 
   updateBusLocation: (busId: string, location: GpsUpdate) => void;
+  clearBusLocation: (busId: string) => void;
   setTracking: (isTracking: boolean) => void;
   setCurrentBus: (busId: string | null) => void;
   clearTracking: () => void;
@@ -21,6 +22,12 @@ export const useTrackingStore = create<TrackingState>((set) => ({
     set((state) => ({
       busLocations: { ...state.busLocations, [busId]: location },
     })),
+
+  clearBusLocation: (busId) =>
+    set((state) => {
+      const { [busId]: _removed, ...rest } = state.busLocations;
+      return { busLocations: rest };
+    }),
 
   setTracking: (isTracking) => set({ isTracking }),
 
